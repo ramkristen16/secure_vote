@@ -1,5 +1,3 @@
-// lib/features/vote/views/vote_casting_view.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -69,9 +67,21 @@ class _VoteCastingViewState extends State<VoteCastingView> {
   @override
   Widget build(BuildContext context) {
     final hasVoted = widget.vote.hasVoted;
-    final isOpen = widget.vote.isOpen;
-    final canVote = isOpen;
+    final notStartedYet = widget.vote.notStartedYet;
+    final isFinished = widget.vote.isFinished;
+    final canVote = widget.vote.isOpen; // Entre startingDate et deadline
 
+    //Si le vote n'a pas encore commencé
+    if (notStartedYet) {
+      return _buildNotStartedView();
+    }
+
+    //Si le vote est terminé
+    if (isFinished) {
+      return _buildFinishedView();
+    }
+
+    // Vue normale pour voter
     return Scaffold(
       backgroundColor: const Color(0xFF0A2E4D),
       appBar: AppBar(
@@ -165,6 +175,7 @@ class _VoteCastingViewState extends State<VoteCastingView> {
                           const SizedBox(height: 8),
                           Row(
                             children: [
+
                               const SizedBox(width: 8),
                               Text(
                                 "Deadline: ${DateFormat('dd/MM/yyyy à HH:mm').format(widget.vote.deadline)}",
@@ -236,9 +247,9 @@ class _VoteCastingViewState extends State<VoteCastingView> {
                               color: const Color(0xFF14B8A6).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: Text(
+                            child: const Text(
                               "1 sélectionné",
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 color: Color(0xFF14B8A6),
                                 fontWeight: FontWeight.w600,
@@ -350,7 +361,7 @@ class _VoteCastingViewState extends State<VoteCastingView> {
                           )
                               : Text(
                             hasVoted
-                                ? "Confirmer mon vote (1 choix)"
+                                ? "Modifier mon vote (1 choix)"
                                 : "Confirmer mon vote (1 choix)",
                             style: const TextStyle(
                               color: Colors.white,
@@ -401,6 +412,193 @@ class _VoteCastingViewState extends State<VoteCastingView> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Vue quand le vote n'a pas encore commencé
+  Widget _buildNotStartedView() {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A2E4D),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "Vote à venir",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        backgroundColor: const Color(0xFF0A2E4D),
+        elevation: 0,
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F2A44).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.schedule,
+                    size: 64,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  widget.vote.title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        "Ce scrutin n'a pas encore commencé",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.play_arrow,
+                            size: 18,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Début: ${DateFormat('dd/MM/yyyy à HH:mm').format(widget.vote.startingDate)}",
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF1A1A1A),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "Vous pourrez voter à partir de cette date",
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Si terminé
+  Widget _buildFinishedView() {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A2E4D),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "Vote terminé",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        backgroundColor: const Color(0xFF0A2E4D),
+        elevation: 0,
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check_circle_outline,
+                    size: 64,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  "Ce scrutin est terminé",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "Consultez les résultats pour voir les votes",
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

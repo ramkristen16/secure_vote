@@ -1,13 +1,11 @@
-// lib/features/vote/views/vote_history_view.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:secure_vote/features/vote/views/history/results_vote_view.dart';
-import 'package:secure_vote/features/vote/views/history/vote_edit.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../../model/subject_model.dart';
 import '../../view_model/vote_view_model.dart';
+import '../edit/edit_view.dart';
 
 
 class VoteHistoryView extends StatelessWidget {
@@ -67,7 +65,7 @@ class VoteHistoryView extends StatelessWidget {
             children: [
               Container(
                 padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
                 ),
@@ -139,7 +137,26 @@ class VoteHistoryView extends StatelessWidget {
   Widget _buildVoteCard(BuildContext context, SubjectModel vote) {
     final vm = context.read<VoteViewModel>();
     final isCreator = vote.isCreatedByMe(vm.currentUserId);
-    final isOpen = vote.deadline.isAfter(DateTime.now());
+
+    // Utiliser les nouvelles propriétés
+    final notStartedYet = vote.notStartedYet;
+    final isActive = vote.isActive;
+    final isFinished = vote.isFinished;
+    final status = vote.status;
+
+    // Définir la couleur du statut
+    Color statusColor;
+    Color statusBgColor;
+    if (notStartedYet) {
+      statusColor = const Color(0xFF0F2A44);
+      statusBgColor = const Color(0xFFFFF3E0);
+    } else if (isActive) {
+      statusColor = const Color(0xFF22C55E);
+      statusBgColor = const Color(0xFFE8F5E9);
+    } else {
+      statusColor = Colors.grey[600]!;
+      statusBgColor = const Color(0xFFF5F5F5);
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -179,9 +196,7 @@ class VoteHistoryView extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: isOpen
-                      ? const Color(0xFFE8F5E9)
-                      : const Color(0xFFF5F5F5),
+                  color: statusBgColor,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -191,19 +206,15 @@ class VoteHistoryView extends StatelessWidget {
                       width: 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: isOpen
-                            ? const Color(0xFF4CAF50)
-                            : Colors.grey[400],
+                        color: statusColor,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      isOpen ? "En cours" : "Terminé",
+                      status, // "À venir", "En cours", ou "Terminé"
                       style: TextStyle(
-                        color: isOpen
-                            ? const Color(0xFF4CAF50)
-                            : Colors.grey[600],
+                        color: statusColor,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -249,9 +260,8 @@ class VoteHistoryView extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   "Deadline: ${DateFormat('dd/MM/yyyy à HH:mm', 'fr_FR').format(vote.deadline)}",
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[700],
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -261,79 +271,83 @@ class VoteHistoryView extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // Boutons d'action
-          Row(
-            children: [
-              // Bouton Modifier (seulement si en cours et créateur)
-              if (isOpen && isCreator)
-                Expanded(
-                  child: SizedBox(
-                    height: 40,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => VoteEditView(vote: vote),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.edit, size: 16),
-                      label: const Text(
-                        "Modifier",
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0A2E4D),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 0,
-                      ),
-                    ),
+          // Bouton selon le statut
+          if (notStartedYet)
+          // Si le vote n'a pas encore commencé - le créateur peut modifier le vote
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F2A44),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => VoteEditView(vote: vote),
                   ),
                 ),
-
-              if (isOpen && isCreator) const SizedBox(width: 8),
-
-              // Bouton Résultats
-              Expanded(
-                child: SizedBox(
-                  height: 40,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => VoteResultsView(vote: vote),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.bar_chart, size: 16),
-                    label: const Text(
-                      "Résultats",
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(
+                      Icons.edit,
+                      size: 18,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      "Modifier le vote",
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF14B8A6),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
-                    ),
-                  ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            )
+          else
+          // En cours ou Terminé - Voir les résultats
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF14B8A6),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => VoteResultsView(vote: vote)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(
+                      Icons.bar_chart_rounded,
+                      size: 18,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      "Voir les résultats",
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

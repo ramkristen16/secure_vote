@@ -1,4 +1,5 @@
-// lib/features/vote/views/vote_invitations_view.dart
+
+
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -301,7 +302,12 @@ class _VoteListScreen extends StatelessWidget {
 
   Widget _buildVoteCard(BuildContext context, SubjectModel vote) {
     final hasVoted = vote.hasVoted;
-    final isOpen = vote.isOpen;
+
+    //  statut
+    final notStartedYet = vote.notStartedYet;
+    final isActive = vote.isActive;
+    final isFinished = vote.isFinished;
+    final status = vote.status;
 
     String? myChoiceName;
     if (hasVoted) {
@@ -309,168 +315,271 @@ class _VoteListScreen extends StatelessWidget {
       myChoiceName = vote.choices[choiceIndex].name;
     }
 
-    return GestureDetector(
-      onTap: () {
-        if (isOpen) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => VoteCastingView(vote: vote),
-            ),
-          );
-        } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => VoteResultsView(vote: vote),
-            ),
-          );
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    vote.title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 17,
-                      color: Color(0xFF1A1A1A),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isOpen
-                        ? const Color(0xFFE8F5E9)
-                        : const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: isOpen
-                              ? const Color(0xFF4CAF50)
-                              : Colors.grey[400],
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isOpen ? "En cours" : "Terminé",
-                        style: TextStyle(
-                          color: isOpen
-                              ? const Color(0xFF4CAF50)
-                              : Colors.grey[600],
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+    // Définir la couleur du statut
+    Color statusColor;
+    Color statusBgColor;
+    if (notStartedYet) {
+      statusColor = const Color(0xFF0F2A44);
+      statusBgColor = const Color(0xFFFFF3E0);
+    } else if (isActive) {
+      statusColor = const Color(0xFF4CAF50);
+      statusBgColor = const Color(0xFFE8F5E9);
+    } else {
+      statusColor = Colors.grey[600]!;
+      statusBgColor = const Color(0xFFF5F5F5);
+    }
 
-            if (vote.description != null && vote.description!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                vote.description!,
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 14,
-                  height: 1.4,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  vote.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                    color: Color(0xFF1A1A1A),
+                  ),
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
-            ],
-
-            const SizedBox(height: 16),
-
-            Row(
-              children: [
-                Icon(
-                  Icons.schedule,
-                  size: 16,
-                  color: Colors.grey[600],
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  "Deadline: ${DateFormat('dd/MM/yyyy').format(vote.deadline)}",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[700],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-
-            if (hasVoted && myChoiceName != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(width: 12),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF14B8A6).withOpacity(0.1),
+                  color: statusBgColor,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.check_circle,
-                      size: 14,
-                      color: Color(0xFF14B8A6),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                     const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        "À voté: $myChoiceName",
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF14B8A6),
-                          fontWeight: FontWeight.w600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                    Text(
+                      status, // À venir, En cours, ou Terminé
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
             ],
+          ),
+
+          if (vote.description != null && vote.description!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              vote.description!,
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+                height: 1.4,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
-        ),
+
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              Icon(
+                Icons.schedule,
+                size: 16,
+                color: Colors.grey[600],
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "Deadline: ${DateFormat('dd/MM/yyyy').format(vote.deadline)}",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[700],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+
+          if (hasVoted && myChoiceName != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFF14B8A6).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.check_circle,
+                    size: 14,
+                    color: Color(0xFF14B8A6),
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      "A voté: $myChoiceName",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF14B8A6),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 16),
+
+          // Boutons d'action selon le statut
+          if (notStartedYet)
+          // Si le vote n'a pas encore commencé
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey[400],
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: null, // Désactivé
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(
+                      Icons.schedule,
+                      size: 18,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      "Pas encore commencé",
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (isActive)
+          // Si le vote est en cours - permettre de voter/modifier
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F2A44),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => VoteCastingView(vote: vote),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      hasVoted ? Icons.edit : Icons.how_to_vote,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      hasVoted ? "Modifier mon vote" : "Voter maintenant",
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+          // Si le vote est terminé - voir les résultats
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF14B8A6),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => VoteResultsView(vote: vote)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(
+                      Icons.bar_chart_rounded,
+                      size: 18,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      "Voir les résultats",
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

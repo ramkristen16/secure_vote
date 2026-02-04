@@ -1,5 +1,3 @@
-
-
 class ChoiceModel {
   String name;
   int voteCount; // FRONT: Mock | BACK: Viendra de l'API
@@ -50,7 +48,7 @@ class ParticipantVote {
 
 class SubjectModel {
   final String id;
-  final String creatorId; // ID du créateur
+  final String creatorId; // id du créateur
   final String title;
   final String? description;
   final DateTime startingDate;
@@ -60,7 +58,7 @@ class SubjectModel {
   final bool isPrivate;
   final DateTime createdAt; // Pour filtrer par date
 
-  // FRONT: Calculé localement | BACK: Viendra de l'API
+  // FRONT: Calculé localement ; BACK: Viendra de l'API
   int participantCount;
   int voteCount;
 
@@ -90,12 +88,37 @@ class SubjectModel {
         createdAt = createdAt ?? DateTime.now(),
         participantVotes = participantVotes ?? [];
 
+  //  Vérifier si le vote n'a pas encore commencé
+  bool get notStartedYet {
+    return DateTime.now().isBefore(startingDate);
+  }
+
+  // Vérifier si le vote est actuellement actif :entre startingDate et deadline
+  bool get isActive {
+    final now = DateTime.now();
+    return now.isAfter(startingDate) && now.isBefore(deadline);
+  }
+
+  //   Vérifier si le vote est terminé
+  bool get isFinished {
+    return DateTime.now().isAfter(deadline);
+  }
+
+  //  status prend en compte le startingDate
+  String get status {
+    if (notStartedYet) return "À venir";
+    if (isActive) return "En cours";
+    return "Terminé";
+  }
+
+  //isOpen prend en compte le startingDate
+  bool get isOpen {
+    final now = DateTime.now();
+    return now.isAfter(startingDate) && now.isBefore(deadline);
+  }
+
   //  pour savoir si c'est ma création
   bool isCreatedByMe(String currentUserId) => creatorId == currentUserId;
-
-  String get status => DateTime.now().isBefore(deadline) ? "Ouvert" : "Terminé";
-
-  bool get isOpen => DateTime.now().isBefore(deadline);
 
   bool get hasVoted => myVoteChoiceIndex != null;
 
@@ -105,7 +128,7 @@ class SubjectModel {
     return choices.map((c) => (c.voteCount / voteCount) * 100).toList();
   }
 
-  // Juste FRONT  - Cette méthode sera remplacée par un appel API
+  // Juste FRONT  - cette méthode sera remplacée par un appel API
   void recordVote(int choiceIndex, String userId, String userName) {
     // Si l'utilisateur a déjà voté, retirer l'ancien vote
     if (hasVoted) {
@@ -188,7 +211,7 @@ class SubjectModel {
       isAnonymous: json['isAnonymous'] ?? true,
       isPrivate: json['isPrivate'] ?? true,
       createdAt: DateTime.parse(json['createdAt']),
-      // Ces données viendront du backend
+      //  données du back
       participantCount: json['participantCount'] ?? 0,
       voteCount: json['voteCount'] ?? 0,
       myVoteChoiceIndex: json['myVoteChoiceIndex']?.toString(),

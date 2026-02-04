@@ -1,4 +1,4 @@
-// lib/features/vote/views/results_vote_view.dart
+
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -270,7 +270,7 @@ class VoteResultsView extends StatelessWidget {
     );
   }
 
-  // --- WIDGETS DE LA VUE ---
+
 
   Widget _buildStatCard(
       String label,
