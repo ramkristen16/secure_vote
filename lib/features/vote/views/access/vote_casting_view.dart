@@ -1,7 +1,12 @@
+
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../core/themes/app_theme.dart';
+import '../../../../core/services/storage_service.dart';
 
 import '../../model/subject_model.dart';
 import '../../view_model/vote_view_model.dart';
@@ -18,13 +23,192 @@ class VoteCastingView extends StatefulWidget {
 class _VoteCastingViewState extends State<VoteCastingView> {
   int? _selectedChoice;
   bool _isSubmitting = false;
+  final _storage = StorageService();
 
   @override
   void initState() {
     super.initState();
-    if (widget.vote.hasVoted) {
-      _selectedChoice = int.parse(widget.vote.myVoteChoiceIndex!);
+    _loadLocalVote();
+  }
+
+  Future<void> _loadLocalVote() async {
+    final localChoice = await _storage.getUserVoteChoice(widget.vote.id);
+
+    if (localChoice != null) {
+      setState(() {
+        _selectedChoice = localChoice;
+      });
+      print(' Choix pré-sélectionné : $localChoice');
+    } else if (widget.vote.hasVoted) {
+      setState(() {
+        _selectedChoice = int.parse(widget.vote.myVoteChoiceIndex!);
+      });
     }
+  }
+
+
+
+  Future<void> _shareVote() async {
+    final vm = context.read<VoteViewModel>();
+
+    // Générer le lien
+    final shareLink = "https://securevote.app/vote/${widget.vote.id}";
+
+    // Message d'invitation
+    final message = _buildInvitationMessage(shareLink);
+
+    try {
+      await Share.share(
+        message,
+        subject: '🗳️ Invitation : ${widget.vote.title}',
+      );
+    } catch (e) {
+      print('❌ Erreur partage : $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Erreur lors du partage"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+
+  // COPIER LE LIEN
+
+
+  void _copyLink() {
+    final shareLink = "https://securevote.app/vote/${widget.vote.id}";
+
+    Clipboard.setData(ClipboardData(text: shareLink));
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: const [
+            Icon(Icons.check_circle, color: Colors.white, size: 20),
+            SizedBox(width: 12),
+            Text("Lien copié dans le presse-papiers"),
+          ],
+        ),
+        backgroundColor: const Color(0xFF4CAF50),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+
+  //  AFFICHER LES OPTIONS DE PARTAGE
+
+
+  void _showShareOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Titre
+            const Text(
+              "Partager le scrutin",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.vote.title,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+
+            const SizedBox(height: 24),
+
+            // Bouton Partager
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF25D366).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.share,
+                  color: Color(0xFF25D366),
+                ),
+              ),
+              title: const Text("Partager via..."),
+              subtitle: const Text("WhatsApp, SMS, Email, etc."),
+              onTap: () {
+                Navigator.pop(context);
+                _shareVote();
+              },
+            ),
+
+            const SizedBox(height: 8),
+
+            // Bouton Copier
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF14B8A6).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.content_copy,
+                  color: Color(0xFF14B8A6),
+                ),
+              ),
+              title: const Text("Copier le lien"),
+              subtitle: const Text("Coller dans n'importe quelle app"),
+              onTap: () {
+                Navigator.pop(context);
+                _copyLink();
+              },
+            ),
+
+            const SizedBox(height: 16),
+
+            // Bouton Annuler
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Annuler"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _buildInvitationMessage(String shareLink) {
+    final deadlineFormatted = DateFormat('dd/MM/yyyy à HH:mm', 'fr_FR').format(widget.vote.deadline);
+
+    return '''🗳️ INVITATION À VOTER
+
+📋 ${widget.vote.title}
+
+${widget.vote.description != null && widget.vote.description!.isNotEmpty ? '📝 ${widget.vote.description}\n\n' : ''}⏰ Date limite : $deadlineFormatted
+
+👉 Votez maintenant :
+$shareLink
+
+${widget.vote.isAnonymous ? '🔒 Vote anonyme et sécurisé\n' : ''}---
+SecureVote''';
   }
 
   Future<void> _submitVote() async {
@@ -66,19 +250,20 @@ class _VoteCastingViewState extends State<VoteCastingView> {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.read<VoteViewModel>();
+    final isMyVote = widget.vote.isCreatedByMe(vm.currentUserId);
+
     final hasVoted = widget.vote.hasVoted;
     final notStartedYet = widget.vote.notStartedYet;
     final isFinished = widget.vote.isFinished;
-    final canVote = widget.vote.isOpen; // Entre startingDate et deadline
+    final canVote = widget.vote.isOpen;
 
-    //Si le vote n'a pas encore commencé
     if (notStartedYet) {
-      return _buildNotStartedView();
+      return _buildNotStartedView(isMyVote);
     }
 
-    //Si le vote est terminé
     if (isFinished) {
-      return _buildFinishedView();
+      return _buildFinishedView(isMyVote);
     }
 
     // Vue normale pour voter
@@ -89,6 +274,14 @@ class _VoteCastingViewState extends State<VoteCastingView> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        // ✨ NOUVEAU : Bouton Partager si c'est mon vote
+        actions: isMyVote ? [
+          IconButton(
+            icon: const Icon(Icons.share, color: Colors.white),
+            tooltip: "Partager ce scrutin",
+            onPressed: _showShareOptions,
+          ),
+        ] : null,
         backgroundColor: const Color(0xFF0A2E4D),
         elevation: 0,
       ),
@@ -142,7 +335,7 @@ class _VoteCastingViewState extends State<VoteCastingView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Dates (Starting date et Deadline)
+                    // Dates
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -160,7 +353,6 @@ class _VoteCastingViewState extends State<VoteCastingView> {
                         children: [
                           Row(
                             children: [
-
                               const SizedBox(width: 8),
                               Text(
                                 "Début: ${DateFormat('dd/MM/yyyy à HH:mm').format(widget.vote.startingDate)}",
@@ -175,7 +367,6 @@ class _VoteCastingViewState extends State<VoteCastingView> {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-
                               const SizedBox(width: 8),
                               Text(
                                 "Deadline: ${DateFormat('dd/MM/yyyy à HH:mm').format(widget.vote.deadline)}",
@@ -287,7 +478,6 @@ class _VoteCastingViewState extends State<VoteCastingView> {
                           ),
                           child: Row(
                             children: [
-                              // Radio button personnalisé
                               Container(
                                 width: 24,
                                 height: 24,
@@ -312,8 +502,6 @@ class _VoteCastingViewState extends State<VoteCastingView> {
                                     : null,
                               ),
                               const SizedBox(width: 14),
-
-                              // Texte du choix
                               Expanded(
                                 child: Text(
                                   choice.name,
@@ -417,7 +605,7 @@ class _VoteCastingViewState extends State<VoteCastingView> {
   }
 
   // Vue quand le vote n'a pas encore commencé
-  Widget _buildNotStartedView() {
+  Widget _buildNotStartedView(bool isMyVote) {
     return Scaffold(
       backgroundColor: const Color(0xFF0A2E4D),
       appBar: AppBar(
@@ -427,22 +615,22 @@ class _VoteCastingViewState extends State<VoteCastingView> {
         ),
         title: const Text(
           "Vote à venir",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
         ),
+        //Bouton partager aussi ici
+        actions: isMyVote ? [
+          IconButton(
+            icon: const Icon(Icons.share, color: Colors.white),
+            onPressed: _showShareOptions,
+          ),
+        ] : null,
         backgroundColor: const Color(0xFF0A2E4D),
         elevation: 0,
       ),
       body: Container(
         decoration: const BoxDecoration(
           color: Color(0xFFF5F5F5),
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
+          borderRadius: BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
         ),
         child: Center(
           child: Padding(
@@ -452,75 +640,29 @@ class _VoteCastingViewState extends State<VoteCastingView> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F2A44).withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.schedule,
-                    size: 64,
-                    color: Colors.grey[600],
-                  ),
+                  decoration: BoxDecoration(color: const Color(0xFF0F2A44).withOpacity(0.1), shape: BoxShape.circle),
+                  child: Icon(Icons.schedule, size: 64, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 24),
-                Text(
-                  widget.vote.title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+                Text(widget.vote.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A)), textAlign: TextAlign.center),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
                   child: Column(
                     children: [
-                      const Text(
-                        "Ce scrutin n'a pas encore commencé",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1A1A1A),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+                      const Text("Ce scrutin n'a pas encore commencé", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1A1A1A)), textAlign: TextAlign.center),
                       const SizedBox(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.play_arrow,
-                            size: 18,
-                            color: Colors.grey[600],
-                          ),
+                          Icon(Icons.play_arrow, size: 18, color: Colors.grey[600]),
                           const SizedBox(width: 8),
-                          Text(
-                            "Début: ${DateFormat('dd/MM/yyyy à HH:mm').format(widget.vote.startingDate)}",
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF1A1A1A),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+                          Text("Début: ${DateFormat('dd/MM/yyyy à HH:mm').format(widget.vote.startingDate)}", style: const TextStyle(fontSize: 14, color: Color(0xFF1A1A1A), fontWeight: FontWeight.w500)),
                         ],
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  "Vous pourrez voter à partir de cette date",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -531,7 +673,7 @@ class _VoteCastingViewState extends State<VoteCastingView> {
   }
 
   // Si terminé
-  Widget _buildFinishedView() {
+  Widget _buildFinishedView(bool isMyVote) {
     return Scaffold(
       backgroundColor: const Color(0xFF0A2E4D),
       appBar: AppBar(
@@ -539,24 +681,21 @@ class _VoteCastingViewState extends State<VoteCastingView> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          "Vote terminé",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
+        title: const Text("Vote terminé", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+        // Bouton partager aussi ici
+        actions: isMyVote ? [
+          IconButton(
+            icon: const Icon(Icons.share, color: Colors.white),
+            onPressed: _showShareOptions,
           ),
-        ),
+        ] : null,
         backgroundColor: const Color(0xFF0A2E4D),
         elevation: 0,
       ),
       body: Container(
         decoration: const BoxDecoration(
           color: Color(0xFFF5F5F5),
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
+          borderRadius: BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
         ),
         child: Center(
           child: Padding(
@@ -566,35 +705,13 @@ class _VoteCastingViewState extends State<VoteCastingView> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.check_circle_outline,
-                    size: 64,
-                    color: Colors.grey[600],
-                  ),
+                  decoration: BoxDecoration(color: Colors.grey.withOpacity(0.1), shape: BoxShape.circle),
+                  child: Icon(Icons.check_circle_outline, size: 64, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 24),
-                const Text(
-                  "Ce scrutin est terminé",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+                const Text("Ce scrutin est terminé", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A)), textAlign: TextAlign.center),
                 const SizedBox(height: 16),
-                Text(
-                  "Consultez les résultats pour voir les votes",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+                Text("Consultez les résultats pour voir les votes", style: TextStyle(fontSize: 14, color: Colors.grey[600]), textAlign: TextAlign.center),
               ],
             ),
           ),

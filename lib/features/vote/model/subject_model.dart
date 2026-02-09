@@ -1,6 +1,6 @@
 class ChoiceModel {
   String name;
-  int voteCount; // FRONT: Mock | BACK: Viendra de l'API
+  int voteCount;
 
   ChoiceModel({
     required this.name,
@@ -48,7 +48,7 @@ class ParticipantVote {
 
 class SubjectModel {
   final String id;
-  final String creatorId; // id du créateur
+  final String creatorId;
   final String title;
   final String? description;
   final DateTime startingDate;
@@ -56,16 +56,13 @@ class SubjectModel {
   final List<ChoiceModel> choices;
   final bool isAnonymous;
   final bool isPrivate;
-  final DateTime createdAt; // Pour filtrer par date
+  final DateTime createdAt;
 
-  // FRONT: Calculé localement ; BACK: Viendra de l'API
   int participantCount;
   int voteCount;
 
-  // Liste des participants (pour affichage si non anonyme)
   List<ParticipantVote> participantVotes;
 
-  // Vote de l'utilisateur actuel
   String? myVoteChoiceIndex;
 
   SubjectModel({
@@ -83,65 +80,53 @@ class SubjectModel {
     this.voteCount = 0,
     List<ParticipantVote>? participantVotes,
     this.myVoteChoiceIndex,
-  }) :
-        id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+  })  : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         createdAt = createdAt ?? DateTime.now(),
         participantVotes = participantVotes ?? [];
 
-  //  Vérifier si le vote n'a pas encore commencé
   bool get notStartedYet {
     return DateTime.now().isBefore(startingDate);
   }
 
-  // Vérifier si le vote est actuellement actif :entre startingDate et deadline
   bool get isActive {
     final now = DateTime.now();
     return now.isAfter(startingDate) && now.isBefore(deadline);
   }
 
-  //   Vérifier si le vote est terminé
   bool get isFinished {
     return DateTime.now().isAfter(deadline);
   }
 
-  //  status prend en compte le startingDate
   String get status {
     if (notStartedYet) return "À venir";
     if (isActive) return "En cours";
     return "Terminé";
   }
 
-  //isOpen prend en compte le startingDate
   bool get isOpen {
     final now = DateTime.now();
     return now.isAfter(startingDate) && now.isBefore(deadline);
   }
 
-  //  pour savoir si c'est ma création
   bool isCreatedByMe(String currentUserId) => creatorId == currentUserId;
 
   bool get hasVoted => myVoteChoiceIndex != null;
 
-  // FRONT: Calcul local | BACK: Remplacer par data de l'API
   List<double> get choicePercentages {
     if (voteCount == 0) return List.filled(choices.length, 0.0);
     return choices.map((c) => (c.voteCount / voteCount) * 100).toList();
   }
 
-  // Juste FRONT  - cette méthode sera remplacée par un appel API
   void recordVote(int choiceIndex, String userId, String userName) {
-    // Si l'utilisateur a déjà voté, retirer l'ancien vote
     if (hasVoted) {
       final oldIndex = int.parse(myVoteChoiceIndex!);
       choices[oldIndex].voteCount--;
       voteCount--;
       participantVotes.removeWhere((v) => v.participantId == userId);
     } else {
-      // Nouveau participant
       participantCount++;
     }
 
-    // Ajouter le nouveau vote
     choices[choiceIndex].voteCount++;
     myVoteChoiceIndex = choiceIndex.toString();
     voteCount++;
@@ -185,7 +170,7 @@ class SubjectModel {
     );
   }
 
-  // Pour l'intégration backend
+  // ✅ CORRECTION : Ajouter myVoteChoiceIndex et participantVotes
   Map<String, dynamic> toJson() => {
     'id': id,
     'creatorId': creatorId,
@@ -197,6 +182,10 @@ class SubjectModel {
     'isAnonymous': isAnonymous,
     'isPrivate': isPrivate,
     'createdAt': createdAt.toIso8601String(),
+    'participantCount': participantCount,              // ✅ AJOUTÉ
+    'voteCount': voteCount,                            // ✅ AJOUTÉ
+    'myVoteChoiceIndex': myVoteChoiceIndex,            // ✅ AJOUTÉ
+    'participantVotes': participantVotes.map((p) => p.toJson()).toList(), // ✅ AJOUTÉ
   };
 
   factory SubjectModel.fromJson(Map<String, dynamic> json, String currentUserId) {
@@ -211,7 +200,6 @@ class SubjectModel {
       isAnonymous: json['isAnonymous'] ?? true,
       isPrivate: json['isPrivate'] ?? true,
       createdAt: DateTime.parse(json['createdAt']),
-      //  données du back
       participantCount: json['participantCount'] ?? 0,
       voteCount: json['voteCount'] ?? 0,
       myVoteChoiceIndex: json['myVoteChoiceIndex']?.toString(),

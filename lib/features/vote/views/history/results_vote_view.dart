@@ -1,10 +1,10 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../../../../core/services/permission_service.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../../model/subject_model.dart';
-
+import '../../view_model/vote_view_model.dart';
 
 class VoteResultsView extends StatelessWidget {
   final SubjectModel vote;
@@ -13,6 +13,23 @@ class VoteResultsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.read<VoteViewModel>();
+    final currentUserId = vm.currentUserId;
+
+    // ═══════════════════════════════════════════════════════════
+    // ✅ VÉRIFICATION SÉCURITÉ : Peut-on voir les résultats ?
+    // ═══════════════════════════════════════════════════════════
+
+    final permission = PermissionService.canViewResults(vote, currentUserId);
+
+    if (!permission.isAllowed) {
+      return _buildResultsLockedView(context, vote, permission.denialReason!);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ✅ AUTORISATION OK : Afficher les résultats
+    // ═══════════════════════════════════════════════════════════
+
     final percentages = vote.choicePercentages;
 
     return Scaffold(
@@ -73,10 +90,10 @@ class VoteResultsView extends StatelessWidget {
                   const SizedBox(width: 16),
                   _buildStatCard(
                     "Statut",
-                    vote.isOpen ? "En cours" : "Terminé",
+                    vote.status, // "À venir", "En cours", "Terminé"
                     "",
                     Icons.trending_up,
-                    vote.isOpen ? const Color(0xFF4CAF50) : Colors.grey,
+                    vote.isFinished ? Colors.grey : const Color(0xFF4CAF50),
                   ),
                 ],
               ),
@@ -101,10 +118,14 @@ class VoteResultsView extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-
+                        Icon(
+                          Icons.play_arrow,
+                          size: 16,
+                          color: Colors.grey[600],
+                        ),
                         const SizedBox(width: 8),
                         Text(
-                          "Début: ${DateFormat('dd/MM/yyyy à HH:mm').format(vote.startingDate)}",
+                          "Début: ${DateFormat('dd/MM/yyyy à HH:mm', 'fr_FR').format(vote.startingDate)}",
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey[700],
@@ -116,10 +137,14 @@ class VoteResultsView extends StatelessWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-
+                        Icon(
+                          Icons.schedule,
+                          size: 16,
+                          color: Colors.grey[600],
+                        ),
                         const SizedBox(width: 8),
                         Text(
-                          "Deadline: ${DateFormat('dd/MM/yyyy à HH:mm').format(vote.deadline)}",
+                          "Deadline: ${DateFormat('dd/MM/yyyy à HH:mm', 'fr_FR').format(vote.deadline)}",
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey[700],
@@ -270,7 +295,161 @@ class VoteResultsView extends StatelessWidget {
     );
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // ✅ NOUVEAU : Écran quand résultats verrouillés
+  // ═══════════════════════════════════════════════════════════
 
+  Widget _buildResultsLockedView(BuildContext context, SubjectModel vote, String reason) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A2E4D),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "Résultats",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        backgroundColor: const Color(0xFF0A2E4D),
+        elevation: 0,
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Icône
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.visibility_off,
+                    size: 50,
+                    color: Colors.orange[700],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Titre
+                const Text(
+                  'Résultats non disponibles',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 12),
+
+                // Raison
+                Text(
+                  reason,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 32),
+
+                // Info deadline
+                if (!vote.isFinished) ...[
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.schedule,
+                              size: 20,
+                              color: Colors.grey[600],
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Résultats disponibles après :',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        Text(
+                          DateFormat('dd MMMM yyyy à HH:mm', 'fr_FR').format(vote.deadline),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A1A1A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+                ],
+
+                // Bouton retour
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF14B8A6),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'J\'ai compris',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildStatCard(
       String label,

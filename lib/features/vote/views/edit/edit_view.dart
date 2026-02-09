@@ -162,7 +162,7 @@ class _VoteEditViewState extends State<VoteEditView> {
     );
 
     // TODO: Remplacer par un appel API pour sauvegarder les modifications
-    final success = await vm.updateVote(updatedVote as String);
+    final success = await vm.updateVote(updatedVote );
 
     setState(() => _isSaving = false);
 
