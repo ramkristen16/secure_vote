@@ -1,14 +1,14 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/themes/app_theme.dart';
+import '../../../../core/services/input_validation_service.dart';
 import '../../view_model/vote_view_model.dart';
 import '../lien_success/vote_succes_view.dart';
 
 
-class CreateVotePage extends StatelessWidget {
-  const CreateVotePage({super.key});
+class VoteCreateView extends StatelessWidget {
+  const VoteCreateView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -164,7 +164,7 @@ class CreateVotePage extends StatelessWidget {
                     context,
                     label: "DÉBUT",
                     value: DateFormat('dd/MM/yyyy à HH:mm', 'fr_FR').format(vm.startingDate),
-                    onTap: () => _pickDateTime(context, vm.startingDate, vm.updateStartingDate),
+                    onTap: () => _pickStartingDate(context, vm),
                   ),
                   const SizedBox(height: 16),
                   _buildDateField(
@@ -173,11 +173,7 @@ class CreateVotePage extends StatelessWidget {
                     value: vm.deadline == null
                         ? "Sélectionner une date"
                         : DateFormat('dd/MM/yyyy à HH:mm', 'fr_FR').format(vm.deadline!),
-                    onTap: () => _pickDateTime(
-                      context,
-                      vm.deadline ?? DateTime.now().add(const Duration(days: 7)),
-                      vm.updateDeadline,
-                    ),
+                    onTap: () => _pickDeadline(context, vm),
                   ),
                 ],
               ),
@@ -320,17 +316,14 @@ class CreateVotePage extends StatelessWidget {
           horizontal: 16,
           vertical: maxLines > 1 ? 16 : 14,
         ),
-        // Bordure normale (grise)
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
         ),
-        // Bordure au focus (verte)
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFF14B8A6), width: 2),
         ),
-        // Bordure en cas d'erreur
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Colors.red, width: 1),
@@ -478,36 +471,38 @@ class CreateVotePage extends StatelessWidget {
     );
   }
 
+
+
+
   void _handleCreate(BuildContext context, VoteViewModel vm) async {
+    // Validation du titre
     if (vm.title.trim().isEmpty) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Le titre est requis"), backgroundColor: Colors.red),
-        );
-      }
+      _showError(context, " Titre requis", "Le titre du scrutin est obligatoire");
       return;
     }
 
+    // Validation de la deadline
     if (vm.deadline == null) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("La deadline est requise"), backgroundColor: Colors.red),
-        );
-      }
+      _showError(context, " Deadline requise", "Veuillez sélectionner une date limite");
       return;
     }
 
+    // Validation des choix
     final validChoices = vm.choices.where((c) => c.name.trim().isNotEmpty).toList();
     if (validChoices.length < 2) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Au moins 2 options requises"), backgroundColor: Colors.red),
-        );
-      }
+      _showError(context, " Options insuffisantes", "Vous devez avoir au moins 2 options de vote");
+      return;
+    }
+
+    try {
+      InputValidationService.validateDates(vm.startingDate, vm.deadline!);
+    } on ValidationException catch (e) {
+      _showError(context, " Erreur de dates", e.message);
       return;
     }
 
     final result = await vm.createScrutin();
+
     if (result != null && context.mounted) {
       Navigator.pushReplacement(
         context,
@@ -518,20 +513,20 @@ class CreateVotePage extends StatelessWidget {
           ),
         ),
       );
+    } else if (context.mounted) {
+      _showError(context, " Erreur", "Impossible de créer le scrutin. Veuillez réessayer.");
     }
   }
 
-  Future<void> _pickDateTime(
-      BuildContext context,
-      DateTime initial,
-      Function(DateTime) onDateSelected,
-      ) async {
+  //  SÉLECTION DATE DE DÉBUT avec validation
+
+  Future<void> _pickStartingDate(BuildContext context, VoteViewModel vm) async {
     final now = DateTime.now();
 
     final date = await showDatePicker(
       context: context,
-      initialDate: initial.isAfter(now) ? initial : now,
-      firstDate: now,
+      initialDate: vm.startingDate.isAfter(now) ? vm.startingDate : now,
+      firstDate: now.subtract(const Duration(minutes: 5)),
       lastDate: DateTime(now.year + 2),
       locale: const Locale('fr', 'FR'),
       builder: (context, child) {
@@ -553,7 +548,7 @@ class CreateVotePage extends StatelessWidget {
     if (date != null && context.mounted) {
       final time = await showTimePicker(
         context: context,
-        initialTime: TimeOfDay.fromDateTime(initial),
+        initialTime: TimeOfDay.fromDateTime(vm.startingDate),
         builder: (context, child) {
           return Theme(
             data: Theme.of(context).copyWith(
@@ -571,14 +566,169 @@ class CreateVotePage extends StatelessWidget {
       );
 
       if (time != null) {
-        onDateSelected(DateTime(
+        final newStartingDate = DateTime(
           date.year,
           date.month,
           date.day,
           time.hour,
           time.minute,
-        ));
+        );
+
+        final fiveMinutesAgo = now.subtract(const Duration(minutes: 5));
+
+        if (newStartingDate.isBefore(fiveMinutesAgo)) {
+          if (context.mounted) {
+            _showError(
+                context,
+                " Date invalide",
+                "La date de début ne peut pas être il y a plus de 5 minutes"
+            );
+          }
+          return;
+        }
+
+        vm.updateStartingDate(newStartingDate);
+
+        if (vm.deadline != null && context.mounted) {
+          _validateDateConsistency(context, vm);
+        }
       }
     }
+  }
+
+
+
+  Future<void> _pickDeadline(BuildContext context, VoteViewModel vm) async {
+    final now = DateTime.now();
+
+    final minDeadline = vm.startingDate.add(const Duration(hours: 1));
+
+    final date = await showDatePicker(
+      context: context,
+      initialDate: vm.deadline ?? minDeadline,
+      firstDate: minDeadline,
+      lastDate: DateTime(now.year + 2),
+      locale: const Locale('fr', 'FR'),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF14B8A6),
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Color(0xFF1A1A1A),
+            ),
+            dialogBackgroundColor: Colors.white,
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (date != null && context.mounted) {
+      final time = await showTimePicker(
+        context: context,
+        initialTime: vm.deadline != null
+            ? TimeOfDay.fromDateTime(vm.deadline!)
+            : const TimeOfDay(hour: 18, minute: 0),
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: Color(0xFF14B8A6),
+                onPrimary: Colors.white,
+                surface: Colors.white,
+                onSurface: Color(0xFF1A1A1A),
+              ),
+              dialogBackgroundColor: Colors.white,
+            ),
+            child: child!,
+          );
+        },
+      );
+
+      if (time != null) {
+        final newDeadline = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          time.hour,
+          time.minute,
+        );
+
+        try {
+          InputValidationService.validateDates(vm.startingDate, newDeadline);
+
+          vm.updateDeadline(newDeadline);
+
+        } on ValidationException catch (e) {
+          if (context.mounted) {
+            _showError(context, " Deadline invalide", e.message);
+          }
+        }
+      }
+    }
+  }
+
+
+  void _validateDateConsistency(BuildContext context, VoteViewModel vm) {
+    if (vm.deadline == null) return;
+
+    try {
+      InputValidationService.validateDates(vm.startingDate, vm.deadline!);
+    } on ValidationException catch (e) {
+      _showError(context, " Attention", e.message);
+    }
+  }
+
+
+  void _showError(BuildContext context, String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[700],
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF14B8A6),
+            ),
+            child: const Text(
+              "OK",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

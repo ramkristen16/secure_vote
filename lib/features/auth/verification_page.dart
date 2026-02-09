@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:secure_vote/features/Dashboard/dashboard_page.dart';
 
 class VerificationPage extends StatelessWidget {
   const VerificationPage({super.key});
+
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +50,12 @@ class VerificationPage extends StatelessWidget {
               height: 55,
               child: ElevatedButton(
                 onPressed: () {
-                  // Logique de vérification ici
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => DashboardPage(),
+                    ),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2DC4B6),

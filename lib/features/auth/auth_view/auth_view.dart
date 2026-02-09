@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:secure_vote/features/auth/verification_page.dart';
 import '../auth_viewModel/auth_viewModel.dart';
 
 
@@ -18,6 +19,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   final _confirmPasswordController = TextEditingController();
 
   late TabController _tabController;
+  bool _obscureLoginPassword = true;
+  bool _obscureSignupPassword = true;
 
   @override
   void initState() {
@@ -198,7 +201,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 decoration: InputDecoration(
                   hintText: 'nom@organisation.fr',
                   hintStyle: TextStyle(color: Colors.grey[400]),
-                  prefixIcon: Icon(Icons.email_outlined, color: Colors.grey[400]),
+                  prefixIcon: Icon(Icons.email_outlined, color: Colors.black54),
                   filled: true,
                   fillColor: const Color(0xFFF5F5F5),
                   border: OutlineInputBorder(
@@ -222,13 +225,25 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               const SizedBox(height: 8),
               TextField(
                 controller: _passwordController,
+                obscureText: _obscureLoginPassword,
                 enabled: !vm.isLoginLoading,
                 onChanged: vm.updateLoginPassword,
-                obscureText: true,
+
                 decoration: InputDecoration(
                   hintText: '••••••••',
                   hintStyle: TextStyle(color: Colors.grey[400]),
-                  prefixIcon: Icon(Icons.lock_outlined, color: Colors.grey[400]),
+                  prefixIcon: Icon(Icons.lock_outlined, color: Colors.black54),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureLoginPassword ? Icons.visibility_off : Icons.visibility,
+                      color: Colors.black54,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscureLoginPassword = !_obscureLoginPassword;
+                      });
+                    },
+                  ),
                   filled: true,
                   fillColor: const Color(0xFFF5F5F5),
                   border: OutlineInputBorder(
@@ -241,7 +256,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               const SizedBox(height: 32),
 
               // Bouton de connexion
-             /* SizedBox(
+             SizedBox(
                 height: 50,
                 child: ElevatedButton(
                   onPressed: vm.canLogin ? () => _handleLogin(context) : null,
@@ -271,7 +286,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     ),
                   ),
                 ),
-              ),*/
+              ),
 
               // Message d'erreur
               if (vm.loginError != null) ...[
@@ -384,11 +399,21 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   controller: _passwordController,
                   enabled: !vm.isSignupLoading,
                   onChanged: vm.updateSignupPassword,
-                  obscureText: true,
                   decoration: InputDecoration(
                     hintText: '••••••••',
                     hintStyle: TextStyle(color: Colors.grey[400]),
                     prefixIcon: Icon(Icons.lock_outlined, color: Colors.grey[400]),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureSignupPassword ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.black54,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureSignupPassword = !_obscureSignupPassword;
+                        });
+                      },
+                    ),
                     filled: true,
                     fillColor: const Color(0xFFF5F5F5),
                     border: OutlineInputBorder(
@@ -415,11 +440,22 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   controller: _confirmPasswordController,
                   enabled: !vm.isSignupLoading,
                   onChanged: vm.updateSignupConfirmPassword,
-                  obscureText: true,
+                  obscureText: _obscureSignupPassword,
                   decoration: InputDecoration(
                     hintText: '••••••••',
                     hintStyle: TextStyle(color: Colors.grey[400]),
                     prefixIcon: Icon(Icons.lock_outlined, color: Colors.grey[400]),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureSignupPassword ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.black54,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureSignupPassword = !_obscureSignupPassword;
+                        });
+                      },
+                    ),
                     filled: true,
                     fillColor: const Color(0xFFF5F5F5),
                     border: OutlineInputBorder(
@@ -433,7 +469,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 const SizedBox(height: 24),
 
                 // Bouton de création de compte
-                /*SizedBox(
+                SizedBox(
                   height: 50,
                   child: ElevatedButton(
                     onPressed: vm.canSignup ? () => _handleSignup(context) : null,
@@ -463,7 +499,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       ),
                     ),
                   ),
-                ),*/
+                ),
 
                 // Message d'erreur
                 if (vm.signupError != null) ...[
@@ -491,7 +527,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
   }
 
- /* Future<void> _handleLogin(BuildContext context) async {
+  Future<void> _handleLogin(BuildContext context) async {
     final vm = context.read<AuthViewModel>();
     final response = await vm.submitLogin();
 
@@ -499,17 +535,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => TwoFAPage(
-            verificationToken: response.verificationToken,
-            email: vm.loginEmail,
-            mode: TwoFAMode.login,
-          ),
+          builder: (_) => VerificationPage(),
         ),
       );
     }
-  }*/
+  }
 
-  /*Future<void> _handleSignup(BuildContext context) async {
+  Future<void> _handleSignup(BuildContext context) async {
     final vm = context.read<AuthViewModel>();
     final response = await vm.submitSignup();
 
@@ -517,13 +549,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => TwoFAPage(
-            verificationToken: response.verificationToken,
-            email: vm.signupEmail,
-            mode: TwoFAMode.signup,
-          ),
+          builder: (_) => VerificationPage(),
         ),
       );
     }
-  }*/
+  }
 }

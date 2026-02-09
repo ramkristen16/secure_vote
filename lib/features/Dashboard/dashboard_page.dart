@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:secure_vote/features/auth/auth_page.dart';
+import 'package:secure_vote/features/auth/auth_view/auth_view.dart';
 import '../vote/view_model/vote_view_model.dart';
 import '../vote/views/access/participation_page.dart';
 import '../vote/views/create/create_vote_page.dart';
@@ -18,6 +18,7 @@ class DashboardPage extends StatelessWidget {
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0A2E4D),
+        automaticallyImplyLeading: false,
         elevation: 0,
         toolbarHeight: 80,
         title: Row(
@@ -62,10 +63,8 @@ class DashboardPage extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => LoginPage()));
-              // Logique de déconnexion
-            },
+            onPressed: () => _showLogoutDialog(context),
+
           ),
         ],
       ),
@@ -85,7 +84,7 @@ class DashboardPage extends StatelessWidget {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const CreateVotePage()),
+                    MaterialPageRoute(builder: (_) => const VoteCreateView()),
                   );
                 },
               ),
@@ -141,6 +140,117 @@ class DashboardPage extends StatelessWidget {
       ),
     );
   }
+  Future<void> _showLogoutDialog(BuildContext context) async {
+    return showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: const [
+              Icon(Icons.logout, color: Color(0xFF0A2E4D)),
+              SizedBox(width: 12),
+              Text(
+                'Déconnexion',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Êtes-vous sûr de vouloir vous déconnecter ?',
+            style: TextStyle(fontSize: 15),
+          ),
+          actions: [
+            // Bouton Annuler
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: Text(
+                'Annuler',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 15,
+                ),
+              ),
+            ),
+
+            // Bouton Déconnexion
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop(); // Fermer le dialogue
+
+                // Afficher loading
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (ctx) => const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF14B8A6),
+                    ),
+                  ),
+                );
+
+                //DÉCONNEXION
+
+                // Fermer le loading
+                if (context.mounted) {
+                  Navigator.of(context).pop();
+                }
+
+
+
+                // Notification de succès
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: const [
+                          Icon(Icons.check_circle, color: Colors.white),
+                          SizedBox(width: 12),
+                          Text('Déconnexion réussie'),
+                        ],
+                      ),
+                      backgroundColor: const Color(0xFF4CAF50),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      margin: const EdgeInsets.all(16),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0A2E4D),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              child: const Text(
+                'Se déconnecter',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
 
   Widget _buildActionCard(
       BuildContext context, {

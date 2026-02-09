@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:secure_vote/features/Dashboard/dashboard_page.dart';
+import 'package:secure_vote/features/vote/views/access/participation_page.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../../../../core/services/storage_service.dart';
@@ -237,7 +239,13 @@ SecureVote''';
       );
 
       await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ParticipationPage(),
+          ));
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -611,7 +619,11 @@ SecureVote''';
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => DashboardPage(),
+              ),),
         ),
         title: const Text(
           "Vote à venir",

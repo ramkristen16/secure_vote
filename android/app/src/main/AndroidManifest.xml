@@ -29,7 +29,7 @@
             </intent-filter>
 
             <!-- ═══════════════════════════════════════════════════════════ -->
-            <!-- ✅ NOUVEAU : Deep linking HTTPS                             -->
+            <!-- NOUVEAU : Deep linking HTTPS                             -->
             <!-- Pour les liens : https://securevote.app/vote/123456         -->
             <!-- ═══════════════════════════════════════════════════════════ -->
             <intent-filter android:autoVerify="true">
@@ -40,15 +40,10 @@
                 <!-- ⚠️ Remplacer "securevote.app" par votre vrai domaine quand prêt -->
                 <data
                     android:scheme="https"
-                    android:host="securevote.app"
-                    android:pathPrefix="/vote" />
+                    android:host="securevote.app" />
             </intent-filter>
 
-            <!-- ═══════════════════════════════════════════════════════════ -->
-            <!-- ✅ NOUVEAU : Deep linking schéma personnalisé               -->
-            <!-- Pour les liens : securevote://vote/123456                   -->
-            <!-- Fonctionne SANS avoir de domaine (pour tests)               -->
-            <!-- ═══════════════════════════════════════════════════════════ -->
+
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

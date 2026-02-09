@@ -1,6 +1,3 @@
-// lib/main.dart
-// Point d'entrée avec AuthViewModel + VoteViewModel
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -168,7 +165,7 @@ class _MyAppState extends State<MyApp> {
             useMaterial3: false,
           ),
 
-          home: authVM.isAuthenticated
+          home: false
               ? DashboardPage()
               : const LoginPage(),
         );

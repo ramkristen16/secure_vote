@@ -1,7 +1,4 @@
-// lib/core/services/input_validation_service.dart
 
-// Service de validation et sanitization des entrées utilisateur
-// Protection contre les injections de code et les données malveillantes
 class InputValidationService {
 
   /// Patterns dangereux à bloquer
@@ -41,7 +38,6 @@ class InputValidationService {
     return cleaned;
   }
 
-  // Nettoyer et valider la description
   static String? sanitizeDescription(String? description) {
     if (description == null || description.trim().isEmpty) {
       return null;
@@ -132,19 +128,9 @@ class InputValidationService {
     return cleaned;
   }
 
-
-  // VALIDATION DES DATES - VERSION SÉCURISÉE
-
-
   /// Valider les dates pour la CRÉATION de vote
   static void validateDates(DateTime startingDate, DateTime deadline) {
     final now = DateTime.now();
-
-
-    // RÈGLE 1 : startingDate ne peut pas être trop dans le passé
-    // Marge de 5 minutes pour éviter les problèmes de synchronisation
-
-
     final fiveMinutesAgo = now.subtract(const Duration(minutes: 5));
 
     if (startingDate.isBefore(fiveMinutesAgo)) {
@@ -153,28 +139,11 @@ class InputValidationService {
       );
     }
 
-
-    // - startingDate = maintenant ,Vote commence immédiatement
-    // - startingDate = dans 2h → Vote planifié
-    // - startingDate = il y a 3 min → OK (marge pour décalage)
-
-    // BLOQUE :
-    // - startingDate = hier → Trop ancien
-    // - startingDate = il y a 10 min → Trop ancien
-
-
-    // RÈGLE 2 : deadline APRÈS startingDate
-
-
     if (deadline.isBefore(startingDate) || deadline.isAtSameMomentAs(startingDate)) {
       throw ValidationException(
           'La deadline doit être après la date de début'
       );
     }
-
-    // RÈGLE 3 : Durée MINIMALE = 1 heure
-    // SÉCURITÉ : Empêche les votes "flash" où personne n'a le temps
-
 
     final duration = deadline.difference(startingDate);
 
@@ -186,23 +155,14 @@ class InputValidationService {
       );
     }
 
-    // SÉCURITÉ : Garantit que tous les participants ont au moins 1h pour voter
-
-
-    // RÈGLE 4 : Durée MAXIMALE = 1 an
     // SÉCURITÉ : Évite les votes qui ne finissent jamais
-
-
     if (duration.inDays > 365) {
       throw ValidationException(
           'Le vote ne peut pas durer plus de 1 an (${duration.inDays} jours demandés)'
       );
     }
 
-    // RÈGLE 5 : Deadline dans le FUTUR
     // SÉCURITÉ : Un vote terminé ne peut pas être créé
-
-
     if (deadline.isBefore(now)) {
       throw ValidationException(
           'La deadline doit être dans le futur'
@@ -211,39 +171,28 @@ class InputValidationService {
   }
 
   // Valider les dates pour la MODIFICATION de vote (VoteEditView)
-  //  startingDate NE PEUT PAS être modifié, seulement la deadline
   static void validateDatesForUpdate(
       DateTime originalStartingDate,
       DateTime newDeadline,
       ) {
     final now = DateTime.now();
 
-
-    //  Nouvelle deadline APRÈS startingDate original
-
-
+    // RÈGLE 1 : Nouvelle deadline APRÈS startingDate original
     if (newDeadline.isBefore(originalStartingDate)) {
       throw ValidationException(
           'La deadline ne peut pas être avant la date de début du vote'
       );
     }
 
-
     // RÈGLE 2 : Nouvelle deadline dans le FUTUR
-
-
     if (newDeadline.isBefore(now)) {
       throw ValidationException(
           'La nouvelle deadline doit être dans le futur'
       );
     }
 
-
     // RÈGLE 3 : Au moins 10 minutes restantes
     // SÉCURITÉ : Évite de fermer le vote trop vite
-
-    
-
     final timeRemaining = newDeadline.difference(now);
 
     if (timeRemaining.inMinutes < 10) {
@@ -275,7 +224,6 @@ class InputValidationService {
         .replaceAll('/', '&#x2F;');
   }
 
-  // Valider un objet vote complet avant envoi au backend
   static void validateVoteObject(Map<String, dynamic> voteData) {
     final requiredFields = ['title', 'startingDate', 'deadline', 'choices', 'creatorId'];
 
@@ -287,7 +235,9 @@ class InputValidationService {
 
     sanitizeTitle(voteData['title'] as String);
 
-    if (voteData.containsKey('description') && voteData['description'] != null) {
+    if (voteData.containsKey('description') &&
+        voteData['description'] != null &&
+        (voteData['description'] as String).trim().isNotEmpty) {
       sanitizeDescription(voteData['description'] as String);
     }
 

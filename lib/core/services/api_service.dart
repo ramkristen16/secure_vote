@@ -452,7 +452,6 @@ class ApiResponse<T> {
       isSuccess: true,
     );
   }
-
   factory ApiResponse.error(String message) {
     return ApiResponse._(
       error: message,
