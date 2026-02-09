@@ -170,7 +170,6 @@ class SubjectModel {
     );
   }
 
-  // ✅ CORRECTION : Ajouter myVoteChoiceIndex et participantVotes
   Map<String, dynamic> toJson() => {
     'id': id,
     'creatorId': creatorId,
@@ -182,10 +181,10 @@ class SubjectModel {
     'isAnonymous': isAnonymous,
     'isPrivate': isPrivate,
     'createdAt': createdAt.toIso8601String(),
-    'participantCount': participantCount,              // ✅ AJOUTÉ
-    'voteCount': voteCount,                            // ✅ AJOUTÉ
-    'myVoteChoiceIndex': myVoteChoiceIndex,            // ✅ AJOUTÉ
-    'participantVotes': participantVotes.map((p) => p.toJson()).toList(), // ✅ AJOUTÉ
+    'participantCount': participantCount,
+    'voteCount': voteCount,
+    'myVoteChoiceIndex': myVoteChoiceIndex,
+    'participantVotes': participantVotes.map((p) => p.toJson()).toList(),
   };
 
   factory SubjectModel.fromJson(Map<String, dynamic> json, String currentUserId) {

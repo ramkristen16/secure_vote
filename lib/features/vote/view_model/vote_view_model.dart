@@ -14,11 +14,9 @@ class VoteViewModel extends ChangeNotifier {
   // SERVICES DE SÉCURITÉ
   final EncryptionService _encryptionService = EncryptionService();
 
-  // STOCKAGE SÉCURISÉ
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   final _storage = StorageService();
 
-  // SIMULATION UTILISATEUR (FRONT)
   String currentUserId = "user_123";
   String currentUserName = "Utilisateur Test";
 

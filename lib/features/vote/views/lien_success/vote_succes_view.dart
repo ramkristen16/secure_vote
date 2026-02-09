@@ -1,5 +1,4 @@
-// lib/features/vote/views/lien_success/vote_succes_view.dart
-// VERSION CORRIGÉE
+
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -171,53 +170,26 @@ class SuccessView extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // ✅ BOUTON PARTAGER (WhatsApp, SMS, Email, etc.)
+                // BOUTON PARTAGER (général)
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF25D366), // WhatsApp green
+                      backgroundColor: const Color(0xFF14B8A6),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       elevation: 0,
                     ),
-                    onPressed: () => _shareViaWhatsApp(context, vote),
+                    onPressed: () => _shareLink(context, vote),
                     icon: const Icon(Icons.share, size: 20),
                     label: const Text(
-                      "Partager via WhatsApp",
+                      "Partager le lien",
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // ✅ BOUTON PARTAGER AUTRES (SMS, Email, Telegram, etc.)
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF14B8A6), width: 2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      backgroundColor: Colors.white,
-                    ),
-                    onPressed: () => _shareViaOthers(context, vote),
-                    icon: const Icon(Icons.more_horiz, color: Color(0xFF14B8A6), size: 20),
-                    label: const Text(
-                      "Autres options de partage",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF14B8A6),
                       ),
                     ),
                   ),
@@ -242,7 +214,7 @@ class SuccessView extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          "SMS • Email • Telegram • Messenger • Copier le lien",
+                          "WhatsApp • SMS • Email • Telegram • Messenger",
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[700],
@@ -358,9 +330,7 @@ class SuccessView extends StatelessWidget {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // ✅ COPIER LE LIEN
-  // ═══════════════════════════════════════════════════════════
+
 
   void _copyLink(BuildContext context) {
     Clipboard.setData(ClipboardData(text: shareLink));
@@ -383,24 +353,20 @@ class SuccessView extends StatelessWidget {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // ✅ PARTAGER VIA WHATSAPP (fonctionne vraiment)
-  // ═══════════════════════════════════════════════════════════
 
-  void _shareViaWhatsApp(BuildContext context, dynamic vote) async {
+
+  void _shareLink(BuildContext context, dynamic vote) async {
     if (vote == null) return;
 
-    // Message d'invitation
     final message = _buildInvitationMessage(vote);
 
     try {
-      // Partager avec sujet
       await Share.share(
         message,
-        subject: '🗳️ Invitation : ${vote.title}',
+        subject: 'Invitation : ${vote.title}',
       );
     } catch (e) {
-      print('❌ Erreur partage : $e');
+      print(' Erreur partage : $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -412,42 +378,21 @@ class SuccessView extends StatelessWidget {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // ✅ PARTAGER AUTRES OPTIONS (SMS, Email, Telegram, etc.)
-  // ═══════════════════════════════════════════════════════════
 
-  void _shareViaOthers(BuildContext context, dynamic vote) async {
-    if (vote == null) return;
-
-    final message = _buildInvitationMessage(vote);
-
-    try {
-      await Share.share(
-        message,
-        subject: '🗳️ Invitation : ${vote.title}',
-      );
-    } catch (e) {
-      print('❌ Erreur partage : $e');
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // ✨ CONSTRUIRE LE MESSAGE D'INVITATION
-  // ═══════════════════════════════════════════════════════════
 
   String _buildInvitationMessage(dynamic vote) {
     final deadlineFormatted = DateFormat('dd/MM/yyyy à HH:mm', 'fr_FR').format(vote.deadline);
 
-    return '''🗳️ INVITATION À VOTER
+    return ''' INVITATION À VOTER
 
-📋 ${vote.title}
+ ${vote.title}
 
-${vote.description != null && vote.description!.isNotEmpty ? '📝 ${vote.description}\n\n' : ''}⏰ Date limite : $deadlineFormatted
+${vote.description != null && vote.description!.isNotEmpty ? ' ${vote.description}\n\n' : ''}⏰ Date limite : $deadlineFormatted
 
-👉 Votez maintenant en cliquant sur ce lien :
-$shareLink
+ Votez maintenant en cliquant sur ce lien :
+shareLink
 
-${vote.isAnonymous ? '🔒 Vote anonyme et sécurisé\n' : ''}
+${vote.isAnonymous ? ' Vote anonyme et sécurisé\n' : ''}
 ---
 SecureVote - Vote sécurisé''';
   }

@@ -1,10 +1,9 @@
-// lib/core/services/api_service_dio.dart
 
 import 'package:dio/dio.dart';
 import 'encryption_service.dart';
 import 'input_validation_service.dart';
 
-/// Service API avec Dio et chiffrement automatique via Interceptors
+// Service API avec Dio et chiffrement automatique via Interceptors
 class ApiService {
   static const String baseUrl = 'https://votre-api.com/api';
 
@@ -38,14 +37,14 @@ class ApiService {
     _dio.interceptors.add(_RetryInterceptor(_dio));
   }
 
-  /// Définir le token JWT
+  // Définir le token JWT
   void setAuthToken(String token) {
     _dio.options.headers['Authorization'] = 'Bearer $token';
   }
   // VOTES
 
 
-  /// Créer un vote
+  // Créer un vote
   Future<ApiResponse<Map<String, dynamic>>> createVote({
     required String title,
     String? description,
