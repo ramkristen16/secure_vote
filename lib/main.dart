@@ -1,13 +1,19 @@
+// lib/main.dart
+// Point d'entrée avec AuthViewModel + VoteViewModel
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:app_links/app_links.dart';
+import 'package:secure_vote/features/Dashboard/dashboard_page.dart';
 import 'dart:async';
 
-import 'features/Dashboard/dashboard_page.dart';
+import 'features/auth/auth_view/auth_view.dart';
+import 'features/auth/auth_viewModel/auth_viewModel.dart';
 import 'features/vote/view_model/vote_view_model.dart';
 import 'features/vote/views/access/vote_casting_view.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +28,12 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: voteViewModel),
+
+        ChangeNotifierProxyProvider<VoteViewModel, AuthViewModel>(
+          create: (context) => AuthViewModel(voteViewModel: voteViewModel),
+          update: (context, voteVM, authVM) =>
+          authVM ?? AuthViewModel(voteViewModel: voteVM),
+        ),
       ],
       child: const MyApp(),
     ),
@@ -43,15 +55,22 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _initDeepLinking();
+    _checkAuthStatus();
+  }
+
+
+  Future<void> _checkAuthStatus() async {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<AuthViewModel>().checkAuthStatus();
+    });
   }
 
   // DEEP LINKING
 
   void _initDeepLinking() async {
-    final appLinks = AppLinks();
-
     try {
-      final uri = await appLinks.getInitialLink();
+      final uri = await _appLinks.getInitialLink();
 
       if (uri != null) {
         print('App ouverte avec lien: $uri');
@@ -61,7 +80,7 @@ class _MyAppState extends State<MyApp> {
       print('Erreur initial link: $e');
     }
 
-    _sub = appLinks.uriLinkStream.listen(
+    _sub = _appLinks.uriLinkStream.listen(
           (Uri uri) {
         print('Lien reçu: $uri');
         _handleDeepLink(uri.toString());
@@ -71,12 +90,6 @@ class _MyAppState extends State<MyApp> {
       },
     );
   }
-
-
-
-
-  // TRAITEMENT DU LIEN
-
 
   void _handleDeepLink(String link) {
     print('Traitement du lien: $link');
@@ -94,9 +107,6 @@ class _MyAppState extends State<MyApp> {
       }
     }
   }
-
-  // NAVIGATION VERS VOTE
-
 
   void _navigateToVote(String voteId) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -137,26 +147,32 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Secure Vote App',
-      debugShowCheckedModeBanner: false,
+    return Consumer<AuthViewModel>(
+      builder: (context, authVM, _) {
+        return MaterialApp(
+          title: 'Secure Vote App',
+          debugShowCheckedModeBanner: false,
 
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('fr', 'FR'),
-      ],
-      locale: const Locale('fr', 'FR'),
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('fr', 'FR'),
+          ],
+          locale: const Locale('fr', 'FR'),
 
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: false,
-      ),
+          theme: ThemeData(
+            primarySwatch: Colors.blue,
+            useMaterial3: false,
+          ),
 
-      home: DashboardPage(),
+          home: authVM.isAuthenticated
+              ? DashboardPage()
+              : const LoginPage(),
+        );
+      },
     );
   }
 }
