@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/themes/app_theme.dart';
 import '../vote/view_model/vote_view_model.dart';
-import '../vote/views/access/vote_invitation.dart';
-import '../vote/views/create/vote_create_view.dart';
-import '../vote/views/history/history_vote_view.dart';
+import '../vote/views/access/participation_page.dart';
+import '../vote/views/create/create_vote_page.dart';
+import '../vote/views/history/vote_history_page.dart';
 
-
-class VoteDashboardView extends StatelessWidget {
-  const VoteDashboardView({super.key});
+class DashboardPage extends StatelessWidget {
+  const DashboardPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +83,7 @@ class VoteDashboardView extends StatelessWidget {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const VoteCreateView()),
+                    MaterialPageRoute(builder: (_) => const CreateVotePage()),
                   );
                 },
               ),
@@ -102,7 +100,7 @@ class VoteDashboardView extends StatelessWidget {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const VoteHistoryView()),
+                    MaterialPageRoute(builder: (_) => const VoteHistoryPage()),
                   );
                 },
               ),
@@ -120,7 +118,7 @@ class VoteDashboardView extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const VoteInvitationsView()),
+                        builder: (_) => const ParticipationPage()),
                   );
                 },
               ),

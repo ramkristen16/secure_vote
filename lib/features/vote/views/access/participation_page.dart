@@ -9,8 +9,8 @@ import '../history/results_vote_view.dart';
 import 'vote_casting_view.dart';
 
 
-class VoteInvitationsView extends StatelessWidget {
-  const VoteInvitationsView({super.key});
+class ParticipationPage extends StatelessWidget {
+  const ParticipationPage({super.key});
 
   @override
   Widget build(BuildContext context) {

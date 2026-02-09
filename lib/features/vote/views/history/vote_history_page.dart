@@ -8,8 +8,8 @@ import '../../view_model/vote_view_model.dart';
 import '../edit/edit_view.dart';
 
 
-class VoteHistoryView extends StatelessWidget {
-  const VoteHistoryView({super.key});
+class VoteHistoryPage extends StatelessWidget {
+  const VoteHistoryPage({super.key});
 
   @override
   Widget build(BuildContext context) {
