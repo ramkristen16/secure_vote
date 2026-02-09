@@ -45,9 +45,7 @@ class _MyAppState extends State<MyApp> {
     _initDeepLinking();
   }
 
-  // ===============================
   // DEEP LINKING
-  // ===============================
 
   void _initDeepLinking() async {
     final appLinks = AppLinks();
@@ -76,9 +74,9 @@ class _MyAppState extends State<MyApp> {
 
 
 
-  // ===============================
+
   // TRAITEMENT DU LIEN
-  // ===============================
+
 
   void _handleDeepLink(String link) {
     print('Traitement du lien: $link');
@@ -97,9 +95,8 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  // ===============================
   // NAVIGATION VERS VOTE
-  // ===============================
+
 
   void _navigateToVote(String voteId) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
