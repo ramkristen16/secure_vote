@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:secure_vote/features/auth/auth_page.dart';
 import '../vote/view_model/vote_view_model.dart';
 import '../vote/views/access/participation_page.dart';
 import '../vote/views/create/create_vote_page.dart';
@@ -62,6 +63,7 @@ class DashboardPage extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => LoginPage()));
               // Logique de déconnexion
             },
           ),
