@@ -5,7 +5,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
 
-import 'package:secure_vote/features/Dashboard/dashboard_view.dart';
+import 'features/Dashboard/dashboard_page.dart';
 import 'features/vote/view_model/vote_view_model.dart';
 import 'features/vote/views/access/vote_casting_view.dart';
 
@@ -159,7 +159,7 @@ class _MyAppState extends State<MyApp> {
         useMaterial3: false,
       ),
 
-      home: VoteDashboardView(),
+      home: DashboardPage(),
     );
   }
 }

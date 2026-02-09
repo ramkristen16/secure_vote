@@ -7,8 +7,8 @@ import '../../view_model/vote_view_model.dart';
 import '../lien_success/vote_succes_view.dart';
 
 
-class VoteCreateView extends StatelessWidget {
-  const VoteCreateView({super.key});
+class CreateVotePage extends StatelessWidget {
+  const CreateVotePage({super.key});
 
   @override
   Widget build(BuildContext context) {
