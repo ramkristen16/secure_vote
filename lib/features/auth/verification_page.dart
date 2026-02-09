@@ -12,31 +12,31 @@ class VerificationPage extends StatelessWidget {
         backgroundColor: const Color(0xff0a2e4d),
         elevation: 0,
         toolbarHeight: 80,
-        title: const Text("Verification code"),
+        title: const Text("Code de verification OTP"),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 40),
-            const Icon(Icons.mark_email_read_outlined, size: 80, color: Color(0xff0a2e4d)),
             const SizedBox(height: 32),
             const Text(
-              "Vérifiez vos messages",
+              "Entrer votre code de verification",
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             const Text(
               "Nous avons envoyé un code de confirmation à votre adresse email.",
-              textAlign: TextAlign.center,
+              textAlign: TextAlign.start,
               style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 32),
 
             // Ligne des champs OTP
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(4, (index) => _otpInputBox(context, index == 0)),
             ),
 
@@ -51,8 +51,12 @@ class VerificationPage extends StatelessWidget {
                   // Logique de vérification ici
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xff0a2e4d),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: const Color(0xFF2DC4B6),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 child: const Text("Vérifier", style: TextStyle(fontSize: 18, color: Colors.white)),
               ),
@@ -63,7 +67,7 @@ class VerificationPage extends StatelessWidget {
               onPressed: () {},
               child: const Text(
                 "Renvoyer le code",
-                style: TextStyle(color: Color(0xff0a2e4d), fontWeight: FontWeight.bold),
+                style: TextStyle(color: Color(0xFF2DC4B6), fontWeight: FontWeight.bold),
               ),
             ),
           ],
