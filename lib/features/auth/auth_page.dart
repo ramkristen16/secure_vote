@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:secure_vote/features/auth/verification_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -230,7 +231,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           SizedBox(
             height: 50,
             child: ElevatedButton(
-              onPressed: () => {},
+              onPressed: () => {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => VerificationPage()))
+              },
               /*onPressed: _viewModel.isLoading ? null : () async {
                 final success = await _viewModel.login(
                   _emailController.text,
@@ -385,7 +388,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
           // Bouton de création de compte
           SizedBox(
-            height: 50,
+            height: 47,
             child: ElevatedButton(
               onPressed: () => {},
               /*onPressed: _viewModel.isLoading ? null : () async {
