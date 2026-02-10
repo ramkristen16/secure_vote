@@ -7,12 +7,15 @@ import 'package:secure_vote/features/Dashboard/dashboard_page.dart';
 import 'dart:async';
 import 'features/auth/auth_view/auth_view.dart';
 import 'features/auth/auth_viewModel/auth_viewModel.dart';
+import 'features/vote/model/subject_model.dart';
 import 'features/vote/view_model/vote_view_model.dart';
 import 'features/vote/views/access/vote_casting_view.dart';
-
+import 'core/services/api_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  ApiService().init();
 
   // Initialisation localisation dates FR
   await initializeDateFormatting('fr_FR', null);
@@ -54,7 +57,6 @@ class _MyAppState extends State<MyApp> {
     _checkAuthStatus();
   }
 
-
   Future<void> _checkAuthStatus() async {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -69,52 +71,80 @@ class _MyAppState extends State<MyApp> {
       final uri = await _appLinks.getInitialLink();
 
       if (uri != null) {
-        print('App ouverte avec lien: $uri');
+        print('🔗 App ouverte avec lien: $uri');
         _handleDeepLink(uri.toString());
       }
     } catch (e) {
-      print('Erreur initial link: $e');
+      print('❌ Erreur initial link: $e');
     }
 
     _sub = _appLinks.uriLinkStream.listen(
           (Uri uri) {
-        print('Lien reçu: $uri');
+        print('🔗 Lien reçu: $uri');
         _handleDeepLink(uri.toString());
       },
       onError: (err) {
-        print('Erreur stream: $err');
+        print('❌ Erreur stream: $err');
       },
     );
   }
 
+  /// 🔥 MODIFIÉ : Gérer le deep linking avec chargement depuis le backend
   void _handleDeepLink(String link) {
-    print('Traitement du lien: $link');
+    print('🔍 Traitement du lien: $link');
 
     final uri = Uri.parse(link);
 
     if (uri.pathSegments.isNotEmpty) {
       if (uri.pathSegments[0] == 'vote' && uri.pathSegments.length > 1) {
         final voteId = uri.pathSegments[1];
-        print('Vote ID extrait: $voteId');
+        print('🗳️ Vote ID extrait: $voteId');
 
         _navigateToVote(voteId);
       } else {
-        print('Format lien non reconnu: ${uri.path}');
+        print('⚠️ Format lien non reconnu: ${uri.path}');
       }
     }
   }
 
+  /// 🔥 MODIFIÉ : Charger le vote depuis le backend si nécessaire
   void _navigateToVote(String voteId) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
 
       final voteViewModel = context.read<VoteViewModel>();
-      final vote = voteViewModel.getVoteById(voteId);
 
+      // 1. Chercher localement d'abord
+      SubjectModel? vote = voteViewModel.getVoteById(voteId);
+
+      // 2. Si pas trouvé localement, charger depuis le backend
+      if (vote == null) {
+        print('⏳ Chargement du vote depuis le backend...');
+
+        // Afficher un indicateur de chargement
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+        vote = await voteViewModel.loadVoteFromBackend(voteId);
+
+        // Fermer le loader
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      }
+
+      if (!mounted) return;
+
+      // 3. Naviguer vers le vote
       if (vote != null) {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => VoteCastingView(vote: vote),
+            builder: (_) => VoteCastingView(vote: vote!),
           ),
         );
       } else {
@@ -164,7 +194,8 @@ class _MyAppState extends State<MyApp> {
             useMaterial3: false,
           ),
 
-          home: false
+          // 🔥 MODIFIÉ : Utiliser authVM.isAuthenticated au lieu de false
+          home: authVM.isAuthenticated
               ? DashboardPage()
               : const LoginPage(),
         );

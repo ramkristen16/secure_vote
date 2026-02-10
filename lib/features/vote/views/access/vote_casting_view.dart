@@ -5,12 +5,12 @@ import 'package:intl/intl.dart';
 import 'package:secure_vote/features/Dashboard/dashboard_page.dart';
 import 'package:secure_vote/features/vote/views/access/participation_page.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../../core/services/api_service.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../../../../core/services/storage_service.dart';
 
 import '../../model/subject_model.dart';
 import '../../view_model/vote_view_model.dart';
-
 
 class VoteCastingView extends StatefulWidget {
   final SubjectModel vote;
@@ -48,7 +48,7 @@ class _VoteCastingViewState extends State<VoteCastingView> {
 
 
 
-  Future<void> _shareVote() async {
+ /* Future<void> _shareVote() async {
     final vm = context.read<VoteViewModel>();
 
     // Générer le lien
@@ -73,15 +73,87 @@ class _VoteCastingViewState extends State<VoteCastingView> {
         );
       }
     }
-  }
+  }*/
 
 
   // COPIER LE LIEN
 
 
-  void _copyLink() {
+  /*void _copyLink() {
     final shareLink = "https://securevote.app/vote/${widget.vote.id}";
 
+    Clipboard.setData(ClipboardData(text: shareLink));
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: const [
+            Icon(Icons.check_circle, color: Colors.white, size: 20),
+            SizedBox(width: 12),
+            Text("Lien copié dans le presse-papiers"),
+          ],
+        ),
+        backgroundColor: const Color(0xFF4CAF50),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }*/
+  Future<void> _shareVote() async {
+    final vm = context.read<VoteViewModel>();
+    final apiService = ApiService();
+
+    String shareLink;
+
+    // 1. Essayer d'obtenir le lien depuis le backend
+    final response = await apiService.getElectionLink(widget.vote.id);
+
+    if (response['success'] == true && response['link'] != null) {
+      shareLink = response['link'];
+      print('🔗 Lien backend: $shareLink');
+    } else {
+      // Fallback sur le lien généré localement
+      shareLink = "https://securevote.app/vote/${widget.vote.id}";
+      print('🔗 Lien local: $shareLink');
+    }
+
+    // 2. Message d'invitation
+    final message = _buildInvitationMessage(shareLink);
+
+    try {
+      await Share.share(
+        message,
+        subject: '🗳️ Invitation : ${widget.vote.title}',
+      );
+    } catch (e) {
+      print('❌ Erreur partage : $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Erreur lors du partage"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 🔥 MODIFIÉ : Copier le lien du backend
+  void _copyLink() async {
+    final apiService = ApiService();
+
+    String shareLink;
+
+    // 1. Essayer d'obtenir le lien depuis le backend
+    final response = await apiService.getElectionLink(widget.vote.id);
+
+    if (response['success'] == true && response['link'] != null) {
+      shareLink = response['link'];
+    } else {
+      shareLink = "https://securevote.app/vote/${widget.vote.id}";
+    }
+
+    // 2. Copier dans le presse-papiers
     Clipboard.setData(ClipboardData(text: shareLink));
 
     ScaffoldMessenger.of(context).showSnackBar(

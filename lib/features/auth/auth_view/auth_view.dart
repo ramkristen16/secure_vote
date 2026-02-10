@@ -399,6 +399,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   controller: _passwordController,
                   enabled: !vm.isSignupLoading,
                   onChanged: vm.updateSignupPassword,
+                  obscureText: _obscureSignupPassword,
                   decoration: InputDecoration(
                     hintText: '••••••••',
                     hintStyle: TextStyle(color: Colors.grey[400]),

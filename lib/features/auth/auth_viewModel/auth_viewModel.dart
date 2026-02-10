@@ -1,23 +1,25 @@
 import 'package:flutter/foundation.dart';
-import 'package:dio/dio.dart';
 import 'dart:async';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../auth_model/auth_model.dart';
-import '../../../core/services/storage_service.dart';
 import '../../vote/view_model/vote_view_model.dart';
+import '../../../core/services/api_service.dart';
 
 class AuthViewModel extends ChangeNotifier {
   final VoteViewModel voteViewModel;
-
-
+  final ApiService _apiService = ApiService();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   AuthViewModel({required this.voteViewModel});
+
   bool _isAuthenticated = false;
   AuthUser? _currentUser;
 
   bool get isAuthenticated => _isAuthenticated;
   AuthUser? get currentUser => _currentUser;
 
+  // ==================== LOGIN ====================
 
   String _loginEmail = '';
   String _loginPassword = '';
@@ -42,6 +44,7 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 🔥 ÉTAPE 1 : Vérifier credentials + envoyer code
   Future<LoginCredentialResponse?> submitLoginSendCode() async {
     if (!canLogin) {
       _loginError = 'Veuillez remplir tous les champs';
@@ -54,23 +57,26 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // TODO: Remplacer par vrai appel API
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Simulation de réponse
-      if (_loginEmail == 'error@test.com') {
-        throw Exception('Email ou mot de passe incorrect');
-      }
-
-      final response = LoginCredentialResponse(
-        statusCode: 200,
-        verificationToken: 'mock_token_${DateTime.now().millisecondsSinceEpoch}',
-        message: 'Code de vérification envoyé à $_loginEmail',
+      // 🔥 Appel API : login/send-code
+      final response = await _apiService.loginSendCode(
+        email: _loginEmail,
+        password: _loginPassword,
       );
 
-      _isLoginLoading = false;
-      notifyListeners();
-      return response;
+      if (response['success'] == true) {
+        // Retourner le code pour l'étape 2FA
+        final mockResponse = LoginCredentialResponse(
+          statusCode: 200,
+          verificationToken: _loginEmail, // On garde l'email pour l'étape suivante
+          message: response['message'] ?? 'Code envoyé par email',
+        );
+
+        _isLoginLoading = false;
+        notifyListeners();
+        return mockResponse;
+      } else {
+        throw Exception(response['message'] ?? 'Erreur de connexion');
+      }
 
     } catch (e) {
       _loginError = e.toString().replaceAll('Exception: ', '');
@@ -79,6 +85,8 @@ class AuthViewModel extends ChangeNotifier {
       return null;
     }
   }
+
+  // ==================== SIGNUP ====================
 
   String _signupEmail = '';
   String _signupFullName = '';
@@ -159,16 +167,11 @@ class AuthViewModel extends ChangeNotifier {
 
   String? _validatePassword(String value) {
     if (value.isEmpty) return null;
-    if (value.length < 8) return 'Minimum 8 caractères';
-    if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Une majuscule requise';
-    if (!RegExp(r'[a-z]').hasMatch(value)) return 'Une minuscule requise';
-    if (!RegExp(r'[0-9]').hasMatch(value)) return 'Un chiffre requis';
-    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value)) {
-      return 'Un caractère spécial requis';
-    }
+    if (value.length < 6) return 'Minimum 6 caractères';
     return null;
   }
 
+  /// 🔥 ÉTAPE 1 : Envoyer code signup
   Future<SignupResponse?> submitSignup() async {
     if (!canSignup) return null;
 
@@ -177,23 +180,24 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // TODO: Remplacer par vrai appel API
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Simulation
-      if (_signupEmail == 'exist@test.com') {
-        throw Exception('Un compte avec cette adresse email existe déjà');
-      }
-
-      final response = SignupResponse(
-        statusCode: 200,
-        message: 'Code de vérification envoyé',
-        verificationToken: 'signup_token_${DateTime.now().millisecondsSinceEpoch}',
+      // 🔥 Appel API : sign-up/send-code
+      final response = await _apiService.signUpSendCode(
+        email: _signupEmail,
       );
 
-      _isSignupLoading = false;
-      notifyListeners();
-      return response;
+      if (response['success'] == true) {
+        final mockResponse = SignupResponse(
+          statusCode: 200,
+          message: response['message'] ?? 'Code envoyé par email',
+          verificationToken: _signupEmail, // On garde l'email pour l'étape suivante
+        );
+
+        _isSignupLoading = false;
+        notifyListeners();
+        return mockResponse;
+      } else {
+        throw Exception(response['message'] ?? 'Erreur d\'inscription');
+      }
 
     } catch (e) {
       _signupError = e.toString().replaceAll('Exception: ', '');
@@ -203,7 +207,7 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-
+  // ==================== 2FA ====================
 
   String _twoFACode = '';
   bool _isTwoFALoading = false;
@@ -241,6 +245,7 @@ class AuthViewModel extends ChangeNotifier {
     });
   }
 
+  /// 🔥 ÉTAPE 2 : Vérifier le code 2FA et finaliser
   Future<bool> verify2FAAndLogin({
     required String verificationToken,
     required TwoFAMode mode,
@@ -256,47 +261,51 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // TODO: Remplacer par vrai appel API
-      await Future.delayed(const Duration(seconds: 1));
+      Map<String, dynamic> response;
 
-      // Simulation
-      if (_twoFACode != '123456') {
-        throw Exception('Code invalide ou expiré');
+      if (mode == TwoFAMode.login) {
+        // 🔥 Appel API : /auth/login (AVEC code)
+        response = await _apiService.login(
+          email: verificationToken, // C'est l'email qu'on a gardé
+          code: _twoFACode,
+        );
+      } else {
+        // 🔥 Appel API : /auth/sign-up (AVEC code)
+        response = await _apiService.signUp(
+          name: _signupFullName,
+          email: verificationToken, // C'est l'email qu'on a gardé
+          password: _signupPassword,
+          code: _twoFACode,
+        );
       }
 
-      final response = TwoFAResponse(
-        statusCode: 200,
-        message: 'Authentification réussie',
-        accessToken: 'access_token_${DateTime.now().millisecondsSinceEpoch}',
-        refreshToken: 'refresh_token_${DateTime.now().millisecondsSinceEpoch}',
-      );
+      if (response['success'] == true) {
+        // Sauvegarder les données utilisateur
+        await voteViewModel.saveUserData(
+          userId: response['userId'] ?? '',
+          userName: response['userName'] ?? _signupFullName,
+          authToken: response['token'] ?? '',
+        );
 
+        _currentUser = AuthUser(
+          id: response['userId'] ?? '',
+          email: response['email'] ?? verificationToken,
+          fullName: response['userName'] ?? '',
+          accessToken: response['token'] ?? '',
+          refreshToken: '',
+        );
 
-      final user = AuthUser(
-        id: 'user_${DateTime.now().millisecondsSinceEpoch}',
-        email: mode == TwoFAMode.login ? _loginEmail : _signupEmail,
-        fullName: mode == TwoFAMode.login ? 'Utilisateur' : _signupFullName,
-        accessToken: response.accessToken,
-        refreshToken: response.refreshToken,
-      );
+        _isAuthenticated = true;
 
+        // Rafraîchir les votes
+        await voteViewModel.refreshVotes();
 
-      await voteViewModel.saveUserData(
-        userId: user.id,
-        userName: user.fullName,
-        authToken: user.accessToken,
-      );
-
-
-      _currentUser = user;
-      _isAuthenticated = true;
-
-
-      await voteViewModel.refreshVotes();
-
-      _isTwoFALoading = false;
-      notifyListeners();
-      return true;
+        _isTwoFALoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        throw Exception(response['message'] ?? 'Code invalide');
+      }
 
     } catch (e) {
       _twoFAError = e.toString().replaceAll('Exception: ', '');
@@ -316,13 +325,27 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // TODO: Remplacer par vrai appel API
-      await Future.delayed(const Duration(seconds: 1));
+      Map<String, dynamic> response;
 
-      _isResending = false;
-      startResendTimer();
-      notifyListeners();
-      return true;
+      if (mode == TwoFAMode.login) {
+        response = await _apiService.loginSendCode(
+          email: verificationToken,
+          password: _loginPassword,
+        );
+      } else {
+        response = await _apiService.signUpSendCode(
+          email: verificationToken,
+        );
+      }
+
+      if (response['success'] == true) {
+        _isResending = false;
+        startResendTimer();
+        notifyListeners();
+        return true;
+      } else {
+        throw Exception('Impossible de renvoyer le code');
+      }
 
     } catch (e) {
       _twoFAError = 'Impossible de renvoyer le code';
@@ -332,10 +355,10 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-
+  // ==================== LOGOUT ====================
 
   Future<void> logout() async {
-    // Effacer toutes les données
+    await _apiService.logout();
     await voteViewModel.clearAllData();
 
     _isAuthenticated = false;
@@ -346,33 +369,43 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-
+  // ==================== CHECK AUTH STATUS ====================
 
   Future<void> checkAuthStatus() async {
     final userId = voteViewModel.currentUserId;
     final userName = voteViewModel.currentUserName;
+    final token = await _secureStorage.read(key: 'authToken');
 
-    if (userId.isNotEmpty && userId != 'user_123') {
+    if (userId.isNotEmpty &&
+        userId != 'user_123' &&
+        token != null &&
+        token.isNotEmpty) {
       _currentUser = AuthUser(
         id: userId,
         email: '',
         fullName: userName,
-        accessToken: '',
+        accessToken: token,
         refreshToken: '',
       );
       _isAuthenticated = true;
+
+      print('✅ Utilisateur authentifié: $userName');
+      notifyListeners();
+    } else {
+      _isAuthenticated = false;
+      _currentUser = null;
+
+      print('❌ Aucun utilisateur authentifié');
       notifyListeners();
     }
   }
 
-
+  // ==================== HELPERS ====================
 
   void _resetAllForms() {
-
     _loginEmail = '';
     _loginPassword = '';
     _loginError = null;
-
 
     _signupEmail = '';
     _signupFullName = '';
@@ -383,7 +416,6 @@ class AuthViewModel extends ChangeNotifier {
     _passwordError = null;
     _confirmPasswordError = null;
     _signupError = null;
-
 
     _twoFACode = '';
     _twoFAError = null;
@@ -396,7 +428,5 @@ class AuthViewModel extends ChangeNotifier {
     super.dispose();
   }
 }
-
-
 
 enum TwoFAMode { login, signup }

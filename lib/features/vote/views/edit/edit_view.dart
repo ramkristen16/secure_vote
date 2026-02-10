@@ -1,5 +1,3 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -55,7 +53,7 @@ class _VoteEditViewState extends State<VoteEditView> {
     final DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: _selectedDeadline,
-      firstDate: widget.vote.startingDate, // Ne peut pas être avant la date de début
+      firstDate: widget.vote.startingDate,
       lastDate: DateTime(2100),
       builder: (context, child) {
         return Theme(
@@ -125,12 +123,14 @@ class _VoteEditViewState extends State<VoteEditView> {
     }
   }
 
+  /// 🔥 MODIFIÉ : Appel API pour sauvegarder les modifications
   Future<void> _saveChanges() async {
     if (!_formKey.currentState!.validate()) return;
 
     // Vérifier qu'il y a au moins 2 choix non vides
     final validChoices = _choiceControllers
         .where((c) => c.text.trim().isNotEmpty)
+        .map((c) => c.text.trim())
         .toList();
 
     if (validChoices.length < 2) {
@@ -147,22 +147,18 @@ class _VoteEditViewState extends State<VoteEditView> {
 
     final vm = context.read<VoteViewModel>();
 
-    // Créer le vote modifié
-    final updatedVote = widget.vote.copyWith(
+    // 🔥 NOUVEAU : Appeler l'API pour modifier le vote
+    final success = await vm.updateVoteOnBackend(
+      voteId: widget.vote.id,
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim().isEmpty
           ? null
           : _descriptionController.text.trim(),
       deadline: _selectedDeadline,
-      choices: validChoices
-          .map((c) => ChoiceModel(name: c.text.trim()))
-          .toList(),
+      choices: validChoices,
       isAnonymous: _isAnonymous,
       isPrivate: _isPrivate,
     );
-
-    // TODO: Remplacer par un appel API pour sauvegarder les modifications
-    final success = await vm.updateVote(updatedVote );
 
     setState(() => _isSaving = false);
 
@@ -176,7 +172,7 @@ class _VoteEditViewState extends State<VoteEditView> {
           duration: Duration(seconds: 2),
         ),
       );
-      Navigator.pop(context);
+      Navigator.pop(context, true); // Retourner true pour indiquer la modification
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

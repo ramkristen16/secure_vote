@@ -1,96 +1,110 @@
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
-
 import '../../../core/services/storage_service.dart';
 import '../model/subject_model.dart';
 import '../../../core/services/input_validation_service.dart';
 import '../../../core/services/permission_service.dart';
+import '../../../core/services/api_service.dart'; // 🔥 NOUVEAU
 
 class VoteViewModel extends ChangeNotifier {
-  // SERVICES DE SÉCURITÉ
-
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   final _storage = StorageService();
+  final ApiService _apiService = ApiService(); // 🔥 NOUVEAU
 
   String currentUserId = "user_123";
   String currentUserName = "Utilisateur Test";
 
-  // BASE DE DONNÉES LOCALE (RAM)
   List<SubjectModel> allVotes = [];
-
-  // ÉTAT DE CHARGEMENT
   bool isLoading = false;
 
-  // VARIABLES DU FORMULAIRE
+  // Variables du formulaire
   String title = "";
   String description = "";
   DateTime startingDate = DateTime.now();
   DateTime? deadline;
   List<ChoiceModel> choices = [
-    ChoiceModel(name: ""),
-    ChoiceModel(name: "")
+    ChoiceModel(name: "", id: ''),
+    ChoiceModel(name: "", id: '')
   ];
   bool isAnonymous = true;
   bool isPrivate = true;
 
+  // ==================== INITIALISATION ====================
 
-  // INITIALISATION : Charger les données au démarrage
-
-
-  /// Appeler au démarrage de l'app
   Future<void> init() async {
     await loadUserData();
     await loadVotesFromLocal();
-    // NOUVEAU : Enrichir avec choix locaux
     await _enrichVotesWithLocalChoices();
   }
 
-  /// Charger les données utilisateur (depuis SecureStorage)
-  Future<void> loadUserData() async {
+ /* Future<void> loadUserData() async {
     try {
-      // Charger l'ID utilisateur (chiffré)
       final userId = await _secureStorage.read(key: 'userId');
       if (userId == null) {
-        // Utiliser le StorageService pour générer un ID
         currentUserId = await _storage.getUserId();
         await _secureStorage.write(key: 'userId', value: currentUserId);
       } else {
         currentUserId = userId;
       }
 
-      // Charger le nom (chiffré)
       final userName = await _secureStorage.read(key: 'userName');
       if (userName == null) {
-        // Utiliser le StorageService
         currentUserName = await _storage.getUserName() ?? 'Utilisateur Test';
         await _secureStorage.write(key: 'userName', value: currentUserName);
       } else {
         currentUserName = userName;
       }
 
-      // Charger le token JWT (chiffré)
       final token = await _secureStorage.read(key: 'authToken');
       if (token != null) {
-        print(' Token chargé: ${token.substring(0, 20)}...');
+        print('🔑 Token chargé: ${token.substring(0, 20)}...');
       }
 
-      print(' Utilisateur chargé: $currentUserName ($currentUserId)');
+      print('👤 Utilisateur chargé: $currentUserName ($currentUserId)');
     } catch (e) {
-      print(' Erreur lors du chargement des données utilisateur: $e');
+      print('❌ Erreur lors du chargement des données utilisateur: $e');
+    }
+*/
+  Future<void> loadUserData() async {
+    try {
+      final userId = await _secureStorage.read(key: 'userId');
+
+      // 🔥 Ne PAS utiliser "user_123" par défaut
+      if (userId != null && userId.isNotEmpty) {
+        currentUserId = userId;
+      } else {
+        currentUserId = ""; // ⚠️ VIDE au lieu de "user_123"
+      }
+
+      final userName = await _secureStorage.read(key: 'userName');
+      if (userName != null && userName.isNotEmpty) {
+        currentUserName = userName;
+      } else {
+        currentUserName = ""; // ⚠️ VIDE au lieu de "Utilisateur Test"
+      }
+
+      final token = await _secureStorage.read(key: 'authToken');
+      if (token != null) {
+        print('🔑 Token chargé: ${token.substring(0, 20)}...');
+      } else {
+        print('⚠️ Aucun token trouvé');
+      }
+
+      print('👤 User: "$currentUserId" / "$currentUserName"');
+    } catch (e) {
+      print('❌ Erreur: $e');
+      currentUserId = "";
+      currentUserName = "";
     }
   }
-
-  /// Sauvegarder les données utilisateur (dans SecureStorage)
   Future<void> saveUserData({
     required String userId,
     required String userName,
     String? authToken,
   }) async {
     try {
-      // Sauvegarder de manière CHIFFRÉE
       await _secureStorage.write(key: 'userId', value: userId);
       await _secureStorage.write(key: 'userName', value: userName);
 
@@ -103,11 +117,10 @@ class VoteViewModel extends ChangeNotifier {
 
       notifyListeners();
     } catch (e) {
-      print(' Erreur lors de la sauvegarde des données utilisateur: $e');
+      print('❌ Erreur lors de la sauvegarde des données utilisateur: $e');
     }
   }
 
-  /// Charger les votes depuis SharedPreferences
   Future<void> loadVotesFromLocal() async {
     try {
       isLoading = true;
@@ -126,94 +139,72 @@ class VoteViewModel extends ChangeNotifier {
         ))
             .toList();
 
-        print(' ${allVotes.length} votes chargés depuis le stockage local');
+        print('📦 ${allVotes.length} votes chargés depuis le stockage local');
       } else {
-        print('  Aucun vote en stockage local');
+        print('📭 Aucun vote en stockage local');
       }
     } catch (e) {
-      print(' Erreur lors du chargement des votes: $e');
+      print('❌ Erreur lors du chargement des votes: $e');
     } finally {
       isLoading = false;
       notifyListeners();
     }
   }
 
-
-
-
-  /// Charger les choix de votes depuis le stockage local sécurisé
   Future<void> _enrichVotesWithLocalChoices() async {
     try {
-      print(' Enrichissement des votes avec les choix locaux...');
+      print('🔄 Enrichissement des votes avec les choix locaux...');
 
       for (int i = 0; i < allVotes.length; i++) {
         final voteId = allVotes[i].id;
-
-        // Lire le choix local depuis StorageService
         final localChoice = await _storage.getUserVoteChoice(voteId);
 
         if (localChoice != null) {
-          // Mettre à jour le vote avec le choix local
           allVotes[i] = allVotes[i].copyWith(
             myVoteChoiceIndex: localChoice.toString(),
           );
-          print(' Choix local chargé : $voteId → choix $localChoice');
+          print('✅ Choix local chargé : $voteId → choix $localChoice');
         }
       }
 
-      print(' Enrichissement terminé');
+      print('✅ Enrichissement terminé');
       notifyListeners();
     } catch (e) {
-      print(' Erreur lors de l\'enrichissement : $e');
+      print('❌ Erreur lors de l\'enrichissement : $e');
     }
   }
 
-  // Sauvegarder les votes dans SharedPreferences
   Future<void> _saveVotesToLocal() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-
-      // Convertir en JSON
       final votesJson = allVotes.map((vote) => vote.toJson()).toList();
-
-      // Sauvegarder
       await prefs.setString('votes', json.encode(votesJson));
-
-      print(' ${allVotes.length} votes sauvegardés localement');
+      print('💾 ${allVotes.length} votes sauvegardés localement');
     } catch (e) {
-      print(' Erreur lors de la sauvegarde des votes: $e');
+      print('❌ Erreur lors de la sauvegarde des votes: $e');
     }
   }
 
-  /// Effacer toutes les données (logout)
   Future<void> clearAllData() async {
     try {
-      // Effacer SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
-
-      // Effacer SecureStorage
       await _secureStorage.deleteAll();
-
-      //  NOUVEAU : Effacer les votes locaux du StorageService
       await _storage.clearAllUserVotes();
 
-      // Réinitialiser la RAM
       allVotes = [];
       currentUserId = "user_123";
       currentUserName = "Utilisateur Test";
 
       notifyListeners();
 
-      print(' Toutes les données effacées');
+      print('🗑️ Toutes les données effacées');
     } catch (e) {
-      print(' Erreur lors de l\'effacement des données: $e');
+      print('❌ Erreur lors de l\'effacement des données: $e');
     }
   }
 
-
-  // GETTERS POUR LES FILTRES (identique à votre code)
-
+  // ==================== GETTERS ====================
 
   List<SubjectModel> get myCreatedVotes =>
       allVotes.where((v) => v.isCreatedByMe(currentUserId)).toList()
@@ -241,9 +232,7 @@ class VoteViewModel extends ChangeNotifier {
     return grouped;
   }
 
-
-  // ACTIONS FORMULAIRE (identique à votre code)
-
+  // ==================== FORMULAIRE ====================
 
   void updateTitle(String val) {
     title = val;
@@ -273,7 +262,7 @@ class VoteViewModel extends ChangeNotifier {
   }
 
   void addChoiceSlot() {
-    choices.add(ChoiceModel(name: ""));
+    choices.add(ChoiceModel(name: "", id: ''));
     notifyListeners();
   }
 
@@ -294,10 +283,9 @@ class VoteViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ==================== CRÉATION DE SCRUTIN (avec API) ====================
 
-  // CRÉATION DE SCRUTIN SÉCURISÉ (votre code + sauvegarde)
-
-
+  /// 🔥 MODIFIÉ : Utilise l'API backend
   Future<Map<String, String>?> createScrutin() async {
     if (title.isEmpty || deadline == null) return null;
 
@@ -312,139 +300,142 @@ class VoteViewModel extends ChangeNotifier {
       isLoading = true;
       notifyListeners();
 
-      // 1. VALIDATION DES ENTRÉES
+      // Validation des entrées
       final cleanTitle = InputValidationService.sanitizeTitle(title);
       final cleanDescription = InputValidationService.sanitizeDescription(description);
       final cleanChoices = InputValidationService.sanitizeChoices(validChoices);
 
-      // 2. VALIDER LES DATES
       InputValidationService.validateDates(startingDate, deadline!);
-
-      // 3. RATE LIMITING
       InputValidationService.checkRateLimit(currentUserId);
 
-      // 4. CRÉER L'OBJET VOTE
-      final voteData = {
-        'title': cleanTitle,
-        'description': cleanDescription,
-        'startingDate': startingDate.toIso8601String(),
-        'deadline': deadline!.toIso8601String(),
-        'choices': cleanChoices,
-        'isAnonymous': isAnonymous,
-        'isPrivate': isPrivate,
-        'creatorId': currentUserId,
-      };
-
-      // 5. VALIDATION COMPLÈTE
-      InputValidationService.validateVoteObject(voteData);
-      // 6. CHIFFREMENT DES DONNÉES
-
-      // 9. CRÉER LE VOTE LOCALEMENT
-      final newVote = SubjectModel(
-        creatorId: currentUserId,
+      // 🔥 APPEL API BACKEND
+      final response = await _apiService.createElection(
         title: cleanTitle,
-        description: cleanDescription,
+        description: cleanDescription!.isEmpty ? null : cleanDescription,
         startingDate: startingDate,
         deadline: deadline!,
-        choices: cleanChoices.map((name) => ChoiceModel(name: name, voteCount: 0)).toList(),
-        isAnonymous: isAnonymous,
+        anonymous: isAnonymous,
         isPrivate: isPrivate,
-        participantCount: 0,
-        voteCount: 0,
+        choices: cleanChoices,
       );
 
-      allVotes.insert(0, newVote);
+      if (response['success'] == true) {
+        // Créer le vote localement aussi (pour l'affichage immédiat)
+        final newVote = SubjectModel(
+          id: response['subjectId'] ?? '', // 🔥 Utiliser l'ID du backend
+          creatorId: currentUserId,
+          title: cleanTitle,
+          description: cleanDescription,
+          startingDate: startingDate,
+          deadline: deadline!,
+          choices: (response['choices'] as List?)
+              ?.map((c) => ChoiceModel(
+            id: c['_id'] ?? c['id'] ?? '',
+            name: c['label'] ?? c['name'] ?? '',
+            voteCount: 0,
+          ))
+              .toList() ??
+              cleanChoices.map((name) => ChoiceModel(name: name, voteCount: 0, id: '')).toList(),
+          isAnonymous: isAnonymous,
+          isPrivate: isPrivate,
+          participantCount: 0,
+          voteCount: 0,
+        );
 
-      // 10. SAUVEGARDER LOCALEMENT
-      await _saveVotesToLocal();
+        allVotes.insert(0, newVote);
+        await _saveVotesToLocal();
 
-      final link = "https://securevote.app/vote/${newVote.id}";
+        final link = response['link'] ?? "https://securevote.app/vote/${newVote.id}";
 
-      // 11. LOGGING SÉCURISÉ
-      PermissionService.logSecurityAction(
-        userId: currentUserId,
-        action: 'CREATE_VOTE',
-        voteId: newVote.id,
-        allowed: true,
-      );
+        PermissionService.logSecurityAction(
+          userId: currentUserId,
+          action: 'CREATE_VOTE',
+          voteId: newVote.id,
+          allowed: true,
+        );
 
-      _resetForm();
-      isLoading = false;
-      notifyListeners();
+        _resetForm();
+        isLoading = false;
+        notifyListeners();
 
-      return {
-        'link': link,
-        'voteId': newVote.id,
-      };
+        return {
+          'link': link,
+          'voteId': newVote.id,
+        };
+      } else {
+        throw Exception(response['message'] ?? 'Erreur de création');
+      }
+
     } on ValidationException catch (e) {
       isLoading = false;
       notifyListeners();
-      print(' Erreur de validation: $e');
+      print('❌ Erreur de validation: $e');
       return null;
     } catch (e) {
       isLoading = false;
       notifyListeners();
-      print(' Erreur lors de la création du vote: $e');
+      print('❌ Erreur lors de la création du vote: $e');
       return null;
     }
   }
 
-  // VOTER AVEC SÉCURITÉ + STOCKAGE LOCAL
+  // ==================== VOTER (avec API) ====================
 
-
+  /// 🔥 MODIFIÉ : Utilise l'API backend
   Future<bool> castVote(SubjectModel vote, int choiceIndex) async {
     try {
       isLoading = true;
       notifyListeners();
 
-      // VÉRIFIER LES PERMISSIONS
+      // Vérifications locales
       final permission = PermissionService.canCastVote(vote, currentUserId);
       permission.throwIfDenied();
 
-      // VALIDER L'INDEX DU CHOIX
       InputValidationService.validateChoiceIndex(choiceIndex, vote.choices.length);
-
-      // RATE LIMITING
       InputValidationService.checkRateLimit(currentUserId);
 
-      // CHIFFRER LE VOTE
-
-
-      //  NOUVEAU : SAUVEGARDER LE CHOIX LOCALEMENT
-
-
-      await _storage.saveUserVoteChoice(vote.id, choiceIndex);
-      print(' Choix sauvegardé localement : ${vote.id} → $choiceIndex');
-
-      // MISE À JOUR LOCALE
-      final index = allVotes.indexWhere((v) => v.id == vote.id);
-      if (index == -1) {
-        isLoading = false;
-        notifyListeners();
-        return false;
+      // Récupérer l'ID du choix
+      final choiceId = vote.choices[choiceIndex].id;
+      if (choiceId.isEmpty) {
+        throw Exception('ID du choix manquant');
       }
 
-      allVotes[index].recordVote(choiceIndex, currentUserId, currentUserName);
-
-      // Mettre à jour myVoteChoiceIndex pour l'UI
-      allVotes[index] = allVotes[index].copyWith(
-        myVoteChoiceIndex: choiceIndex.toString(),
+      // 🔥 APPEL API BACKEND
+      final response = await _apiService.voteForElection(
+        subjectId: vote.id,
+        choiceId: choiceId,
       );
 
-      // SAUVEGARDER LA LISTE DES VOTES
-      await _saveVotesToLocal();
+      if (response['success'] == true) {
+        // Sauvegarder le choix localement
+        await _storage.saveUserVoteChoice(vote.id, choiceIndex);
+        print('💾 Choix sauvegardé localement : ${vote.id} → $choiceIndex');
 
-      // LOGGING
-      PermissionService.logSecurityAction(
-        userId: currentUserId,
-        action: 'CAST_VOTE',
-        voteId: vote.id,
-        allowed: true,
-      );
+        // Mise à jour locale
+        final index = allVotes.indexWhere((v) => v.id == vote.id);
+        if (index != -1) {
+          allVotes[index].recordVote(choiceIndex, currentUserId, currentUserName);
+          allVotes[index] = allVotes[index].copyWith(
+            myVoteChoiceIndex: choiceIndex.toString(),
+          );
 
-      isLoading = false;
-      notifyListeners();
-      return true;
+          await _saveVotesToLocal();
+        }
+
+        PermissionService.logSecurityAction(
+          userId: currentUserId,
+          action: 'CAST_VOTE',
+          voteId: vote.id,
+          allowed: true,
+        );
+
+        isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        throw Exception(response['message'] ?? 'Erreur lors du vote');
+      }
+
     } on PermissionDeniedException catch (e) {
       isLoading = false;
       notifyListeners();
@@ -457,97 +448,226 @@ class VoteViewModel extends ChangeNotifier {
         reason: e.message,
       );
 
-      print(' Permission refusée: $e');
+      print('❌ Permission refusée: $e');
       return false;
     } catch (e) {
       isLoading = false;
       notifyListeners();
-      print(' Erreur lors du vote: $e');
+      print('❌ Erreur lors du vote: $e');
       return false;
     }
   }
 
+  // ==================== DEEP LINKING : Charger un vote depuis le backend ====================
 
-  // MODIFIER UN VOTE (votre code + sauvegarde)
-
-
-  Future<bool> updateVote(SubjectModel updatedVote) async {
+  /// 🔥 NOUVEAU : Charger un vote depuis le backend via son ID
+  /// Utilisé quand on clique sur un lien partagé
+  Future<SubjectModel?> loadVoteFromBackend(String voteId) async {
     try {
+      print('🔗 Chargement du vote $voteId depuis le backend...');
+
       isLoading = true;
       notifyListeners();
 
-      final index = allVotes.indexWhere((v) => v.id == updatedVote.id);
-      if (index == -1) {
-        isLoading = false;
-        notifyListeners();
-        return false;
+      // 1. Récupérer les infos publiques du vote
+      final response = await _apiService.getElectionWelcome(voteId);
+
+      if (response['success'] != true) {
+        throw Exception(response['message'] ?? 'Vote introuvable');
       }
 
-      // VÉRIFIER LES PERMISSIONS
-      final permission = PermissionService.canEditVote(updatedVote, currentUserId);
-      permission.throwIfDenied();
+      final electionData = response['election'];
 
-      // VALIDATION
-      final cleanTitle = InputValidationService.sanitizeTitle(updatedVote.title);
-      final cleanDescription = InputValidationService.sanitizeDescription(updatedVote.description);
+      // 2. S'inscrire automatiquement comme participant
+      await _apiService.registerForElection(voteId);
 
-      // MISE À JOUR LOCALE
-      allVotes[index] = updatedVote.copyWith(
-        title: cleanTitle,
-        description: cleanDescription,
+      // 3. Créer l'objet SubjectModel
+      final vote = SubjectModel(
+        id: electionData['_id'] ?? electionData['id'] ?? voteId,
+        creatorId: electionData['creatorId'] ?? '',
+        title: electionData['title'] ?? '',
+        description: electionData['description'] ?? '',
+        startingDate: DateTime.parse(electionData['startingDate'] ?? DateTime.now().toIso8601String()),
+        deadline: DateTime.parse(electionData['deadline'] ?? DateTime.now().toIso8601String()),
+        choices: (electionData['choices'] as List?)
+            ?.map((c) => ChoiceModel(
+          id: c['_id'] ?? c['id'] ?? '',
+          name: c['label'] ?? c['name'] ?? '',
+          voteCount: c['votes'] ?? c['voteCount'] ?? 0,
+        ))
+            .toList() ??
+            [],
+        isAnonymous: electionData['anonymous'] ?? true,
+        isPrivate: electionData['isPrivate'] ?? electionData['is_private'] ?? false,
+        participantCount: electionData['participantCount'] ?? 0,
+        voteCount: electionData['voteCount'] ?? 0,
       );
 
-      // SAUVEGARDER LOCALEMENT
-      await _saveVotesToLocal();
+      // 4. Vérifier si le vote existe déjà localement
+      final existingIndex = allVotes.indexWhere((v) => v.id == vote.id);
 
-      // LOGGING
-      PermissionService.logSecurityAction(
-        userId: currentUserId,
-        action: 'UPDATE_VOTE',
-        voteId: updatedVote.id,
-        allowed: true,
-      );
+      if (existingIndex == -1) {
+        // Ajouter le vote à la liste locale
+        allVotes.add(vote);
+        await _saveVotesToLocal();
+        print('✅ Vote ajouté à la liste locale');
+      } else {
+        // Mettre à jour le vote existant
+        allVotes[existingIndex] = vote;
+        await _saveVotesToLocal();
+        print('✅ Vote mis à jour dans la liste locale');
+      }
 
-      isLoading = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      isLoading = false;
-      notifyListeners();
-      print(' Erreur lors de la mise à jour: $e');
-      return false;
-    }
-  }
-
-
-  //  NOUVEAU : UTILITAIRES avec chargement du choix local
-
-  /// Récupérer un vote par son ID (avec choix local pré-chargé)
-  /// Version asynchrone pour charger le choix depuis le storage
-  Future<SubjectModel?> getVoteByIdAsync(String id) async {
-    try {
-      final vote = allVotes.firstWhere((v) => v.id == id);
-
-      // Charger le choix local
-      final localChoice = await _storage.getUserVoteChoice(id);
-
+      // 5. Charger le choix local si existant
+      final localChoice = await _storage.getUserVoteChoice(voteId);
       if (localChoice != null) {
-        print(' Choix local trouvé : $id → $localChoice');
-
-        // Retourner le vote avec le choix pré-rempli
-        return vote.copyWith(
+        final updatedVote = vote.copyWith(
           myVoteChoiceIndex: localChoice.toString(),
         );
+
+        isLoading = false;
+        notifyListeners();
+        return updatedVote;
       }
 
+      isLoading = false;
+      notifyListeners();
       return vote;
+
     } catch (e) {
-      print(' Vote introuvable : $e');
+      isLoading = false;
+      notifyListeners();
+      print('❌ Erreur lors du chargement du vote: $e');
       return null;
     }
   }
 
-  /// Version synchrone (pour compatibilité avec votre code existant)
+  // ==================== REFRESH ====================
+
+  /// 🔥 MODIFIÉ : Synchroniser avec le backend
+  Future<void> refreshVotes() async {
+    isLoading = true;
+    notifyListeners();
+
+    try {
+      // 1. Charger les votes créés par moi
+      final createdResponse = await _apiService.getCreatedElections();
+
+      if (createdResponse['success'] == true) {
+        final createdElections = createdResponse['elections'] as List;
+
+        // Convertir en SubjectModel
+        for (var electionData in createdElections) {
+          final vote = SubjectModel(
+            id: electionData['_id'] ?? electionData['id'] ?? '',
+            creatorId: currentUserId,
+            title: electionData['title'] ?? '',
+            description: electionData['description'] ?? '',
+            startingDate: DateTime.parse(electionData['startingDate'] ?? DateTime.now().toIso8601String()),
+            deadline: DateTime.parse(electionData['deadline'] ?? DateTime.now().toIso8601String()),
+            choices: (electionData['choices'] as List?)
+                ?.map((c) => ChoiceModel(
+              id: c['_id'] ?? c['id'] ?? '',
+              name: c['label'] ?? c['name'] ?? '',
+              voteCount: c['votes'] ?? c['voteCount'] ?? 0,
+            ))
+                .toList() ??
+                [],
+            isAnonymous: electionData['anonymous'] ?? true,
+            isPrivate: electionData['isPrivate'] ?? false,
+            participantCount: electionData['participantCount'] ?? 0,
+            voteCount: electionData['voteCount'] ?? 0,
+          );
+
+          final existingIndex = allVotes.indexWhere((v) => v.id == vote.id);
+          if (existingIndex == -1) {
+            allVotes.add(vote);
+          } else {
+            allVotes[existingIndex] = vote;
+          }
+        }
+      }
+
+      // 2. Charger les votes où je participe
+      final participatingResponse = await _apiService.getParticipatingElections();
+
+      if (participatingResponse['success'] == true) {
+        final invitations = participatingResponse['invitations'] as List;
+
+        for (var invitation in invitations) {
+          final electionData = invitation['subject'] ?? invitation;
+
+          final vote = SubjectModel(
+            id: electionData['_id'] ?? electionData['id'] ?? '',
+            creatorId: electionData['creatorId'] ?? '',
+            title: electionData['title'] ?? '',
+            description: electionData['description'] ?? '',
+            startingDate: DateTime.parse(electionData['startingDate'] ?? DateTime.now().toIso8601String()),
+            deadline: DateTime.parse(electionData['deadline'] ?? DateTime.now().toIso8601String()),
+            choices: (electionData['choices'] as List?)
+                ?.map((c) => ChoiceModel(
+              id: c['_id'] ?? c['id'] ?? '',
+              name: c['label'] ?? c['name'] ?? '',
+              voteCount: c['votes'] ?? c['voteCount'] ?? 0,
+            ))
+                .toList() ??
+                [],
+            isAnonymous: electionData['anonymous'] ?? true,
+            isPrivate: electionData['isPrivate'] ?? false,
+            participantCount: electionData['participantCount'] ?? 0,
+            voteCount: electionData['voteCount'] ?? 0,
+          );
+
+          final existingIndex = allVotes.indexWhere((v) => v.id == vote.id);
+          if (existingIndex == -1) {
+            allVotes.add(vote);
+          } else {
+            allVotes[existingIndex] = vote;
+          }
+        }
+      }
+
+      // 3. Sauvegarder localement
+      await _saveVotesToLocal();
+
+      // 4. Enrichir avec les choix locaux
+      await _enrichVotesWithLocalChoices();
+
+      print('✅ ${allVotes.length} votes synchronisés avec le backend');
+
+    } catch (e) {
+      print('❌ Erreur lors du rafraîchissement: $e');
+      // En cas d'erreur, charger depuis le local
+      await loadVotesFromLocal();
+      await _enrichVotesWithLocalChoices();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // ==================== UTILITAIRES ====================
+
+  Future<SubjectModel?> getVoteByIdAsync(String id) async {
+    try {
+      // 1. Chercher localement
+      final localVote = allVotes.firstWhere((v) => v.id == id);
+      final localChoice = await _storage.getUserVoteChoice(id);
+
+      if (localChoice != null) {
+        return localVote.copyWith(
+          myVoteChoiceIndex: localChoice.toString(),
+        );
+      }
+
+      return localVote;
+    } catch (e) {
+      // 2. Si pas trouvé localement, charger depuis le backend
+      print('⚠️ Vote non trouvé localement, chargement depuis le backend...');
+      return await loadVoteFromBackend(id);
+    }
+  }
+
   SubjectModel? getVoteById(String id) {
     try {
       return allVotes.firstWhere((v) => v.id == id);
@@ -561,27 +681,163 @@ class VoteViewModel extends ChangeNotifier {
     description = "";
     startingDate = DateTime.now();
     deadline = null;
-    choices = [ChoiceModel(name: ""), ChoiceModel(name: "")];
+    choices = [ChoiceModel(name: "", id: ''), ChoiceModel(name: "", id: '')];
     isAnonymous = true;
     isPrivate = true;
   }
 
-  Future<void> refreshVotes() async {
-    isLoading = true;
-    notifyListeners();
-
+  Future<bool> updateVote(SubjectModel updatedVote) async {
     try {
-      // TODO: Appel API quand backend prêt
-      await Future.delayed(const Duration(seconds: 1));
-      await loadVotesFromLocal();
+      isLoading = true;
+      notifyListeners();
 
-      //  NOUVEAU : Enrichir avec les choix locaux après refresh
-      await _enrichVotesWithLocalChoices();
-    } catch (e) {
-      print(' Erreur lors du rafraîchissement: $e');
-    } finally {
+      final index = allVotes.indexWhere((v) => v.id == updatedVote.id);
+      if (index == -1) {
+        isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      final permission = PermissionService.canEditVote(updatedVote, currentUserId);
+      permission.throwIfDenied();
+
+      final cleanTitle = InputValidationService.sanitizeTitle(updatedVote.title);
+      final cleanDescription = InputValidationService.sanitizeDescription(updatedVote.description);
+
+      allVotes[index] = updatedVote.copyWith(
+        title: cleanTitle,
+        description: cleanDescription,
+      );
+
+      await _saveVotesToLocal();
+
+      PermissionService.logSecurityAction(
+        userId: currentUserId,
+        action: 'UPDATE_VOTE',
+        voteId: updatedVote.id,
+        allowed: true,
+      );
+
       isLoading = false;
       notifyListeners();
+      return true;
+    } catch (e) {
+      isLoading = false;
+      notifyListeners();
+      print('❌ Erreur lors de la mise à jour: $e');
+      return false;
+    }
+
+  }
+  // ==================== MÉTHODES À AJOUTER DANS VoteViewModel ====================
+
+  /// 🔥 NOUVEAU : Modifier un vote via l'API
+  Future<bool> updateVoteOnBackend({
+    required String voteId,
+    required String title,
+    String? description,
+    required DateTime deadline,
+    required List<String> choices,
+    required bool isAnonymous,
+    required bool isPrivate,
+  }) async {
+    try {
+      isLoading = true;
+      notifyListeners();
+
+      // 🔥 Appel API pour modifier
+      final response = await _apiService.updateElection(
+        subjectId: voteId,
+        title: title,
+        description: description,
+        deadline: deadline,
+        anonymous: isAnonymous,
+        isPrivate: isPrivate,
+        choices: choices,
+      );
+
+      if (response['success'] == true) {
+        // Mettre à jour localement aussi
+        final index = allVotes.indexWhere((v) => v.id == voteId);
+        if (index != -1) {
+          allVotes[index] = allVotes[index].copyWith(
+            title: title,
+            description: description,
+            deadline: deadline,
+            choices: choices.map((name) => ChoiceModel(name: name, id: '', voteCount: 0)).toList(),
+            isAnonymous: isAnonymous,
+            isPrivate: isPrivate,
+          );
+
+          await _saveVotesToLocal();
+        }
+
+        isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        throw Exception(response['message'] ?? 'Erreur de modification');
+      }
+    } catch (e) {
+      isLoading = false;
+      notifyListeners();
+      print('❌ Erreur lors de la modification: $e');
+      return false;
+    }
+  }
+
+  /// 🔥 NOUVEAU : Supprimer un vote via l'API
+  Future<bool> deleteVoteOnBackend(String voteId) async {
+    try {
+      isLoading = true;
+      notifyListeners();
+
+      // 🔥 Appel API pour supprimer
+      final response = await _apiService.deleteElection(voteId);
+
+      if (response['success'] == true) {
+        // Supprimer localement aussi
+        allVotes.removeWhere((v) => v.id == voteId);
+        await _saveVotesToLocal();
+
+        // Supprimer le choix local si existant
+        await _storage.deleteUserVoteChoice(voteId);
+
+        isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        throw Exception(response['message'] ?? 'Erreur de suppression');
+      }
+    } catch (e) {
+      isLoading = false;
+      notifyListeners();
+      print('❌ Erreur lors de la suppression: $e');
+      return false;
+    }
+  }
+
+  /// 🔥 NOUVEAU : Obtenir les résultats d'un vote depuis l'API
+  Future<Map<String, dynamic>?> getVoteResults(String voteId) async {
+    try {
+      isLoading = true;
+      notifyListeners();
+
+      final response = await _apiService.getElectionResults(voteId);
+
+      isLoading = false;
+      notifyListeners();
+
+      if (response['success'] == true) {
+        return response['results'];
+      }
+
+      return null;
+    } catch (e) {
+      isLoading = false;
+      notifyListeners();
+      print('❌ Erreur lors de la récupération des résultats: $e');
+      return null;
     }
   }
 }

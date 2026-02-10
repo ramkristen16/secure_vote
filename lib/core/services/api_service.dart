@@ -1,8 +1,7 @@
-
 import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import '../utils/secure_storage.dart';
-
+/// Service API pour SecureVote
 class ApiService {
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
@@ -11,7 +10,8 @@ class ApiService {
   static const String baseUrl = 'https://secure-vote-f4mp.onrender.com';
 
   late Dio _dio;
-  final SecureStorage _storage = SecureStorage();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  bool _isRefreshing = false;
 
   void init() {
     _dio = Dio(
@@ -26,51 +26,70 @@ class ApiService {
       ),
     );
 
-    // Intercepteur pour ajouter automatiquement le token
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await _storage.getToken();
-          if (token != null) {
+          final token = await _secureStorage.read(key: 'authToken');
+          if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
-          print(' ${options.method} ${options.path}');
+          print('🚀 ${options.method} ${options.path}');
           return handler.next(options);
         },
         onResponse: (response, handler) {
-          print(' ${response.statusCode} ${response.requestOptions.path}');
+          print('✅ ${response.statusCode} ${response.requestOptions.path}');
           return handler.next(response);
         },
-        onError: (error, handler) {
-          print(' ${error.response?.statusCode} ${error.requestOptions.path}');
+        onError: (error, handler) async {
+          print('❌ ${error.response?.statusCode} ${error.requestOptions.path}');
           print('   ${error.response?.data}');
+
+          if (error.response?.statusCode == 401 && !_isRefreshing) {
+            _isRefreshing = true;
+
+            try {
+              final newToken = await refreshToken();
+
+              if (newToken != null) {
+                error.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+                final response = await _dio.fetch(error.requestOptions);
+                _isRefreshing = false;
+                return handler.resolve(response);
+              }
+            } catch (e) {
+              print('❌ Refresh token failed: $e');
+            }
+
+            _isRefreshing = false;
+          }
+
           return handler.next(error);
         },
       ),
     );
   }
 
-  // GET / - Welcome message
-  Future<Map<String, dynamic>> getWelcome() async {
-    try {
-      final response = await _dio.get('/');
-      return response.data;
-    } catch (e) {
-      return {'success': false, 'message': 'Erreur'};
+  String _getErrorMessage(DioException e) {
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.receiveTimeout) {
+      return 'Le serveur met trop de temps à répondre.\n\n'
+          'Render démarre peut-être l\'application.\n'
+          'Réessayez dans 30-60 secondes.';
+    } else if (e.type == DioExceptionType.connectionError) {
+      return 'Impossible de contacter le serveur.\n\n'
+          'Vérifiez votre connexion internet.';
+    } else if (e.response?.statusCode == 401) {
+      return 'Email ou mot de passe incorrect';
+    } else if (e.response?.statusCode == 409) {
+      return 'Un compte avec cette adresse email existe déjà';
+    } else if (e.response?.data != null) {
+      return e.response?.data['message'] ??
+          e.response?.data['error'] ??
+          'Une erreur est survenue';
     }
+    return 'Une erreur est survenue';
   }
 
-  //GET /status - App status
-  Future<Map<String, dynamic>> getStatus() async {
-    try {
-      final response = await _dio.get('/status');
-      return response.data;
-    } catch (e) {
-      return {'status': 'error'};
-    }
-  }
-
-  // GET /health
   Future<bool> checkHealth() async {
     try {
       final response = await _dio.get('/health');
@@ -80,39 +99,44 @@ class ApiService {
     }
   }
 
-    Map<String, dynamic> _handleAuthError(DioException e) {
-      String errorMessage = 'Erreur réseau';
+  // ==================== AUTH ENDPOINTS (AVEC 2FA) ====================
 
-      if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.receiveTimeout) {
-        errorMessage = 'Le serveur met trop de temps à répondre.\n\n'
-            'Render démarre peut-être l\'application.\n'
-            'Réessayez dans 30-60 secondes.';
-      } else if (e.type == DioExceptionType.connectionError) {
-        errorMessage = 'Impossible de contacter le serveur.\n\n'
-            'Vérifiez votre connexion internet.';
-      } else if (e.response?.statusCode == 401) {
-        errorMessage = 'Email ou mot de passe incorrect';
-      } else if (e.response?.statusCode == 409) {
-        errorMessage = 'Un compte avec cette adresse email existe déjà';
-      } else if (e.response?.data != null) {
-        errorMessage = e.response?.data['message'] ?? e.response?.data['error'] ?? errorMessage;
+  /// 🔥 ÉTAPE 1 : POST /api/v1/auth/sign-up/send-code
+  Future<Map<String, dynamic>> signUpSendCode({
+    required String email,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/v1/auth/sign-up/send-code',
+        data: {'email': email},
+      );
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': response.data['message'] ?? 'Code envoyé',
+          'code': response.data['code'], // En dev uniquement
+        };
       }
 
       return {
         'success': false,
-        'message': errorMessage,
+        'message': 'Erreur lors de l\'envoi du code',
+      };
+    } on DioException catch (e) {
+      return {
+        'success': false,
+        'message': _getErrorMessage(e),
       };
     }
+  }
 
-  // AUTH ENDPOINTS (/api/v1/auth)
-
-
-  // POST /api/v1/auth/sign-up
+  /// 🔥 ÉTAPE 2 : POST /api/v1/auth/sign-up (AVEC code)
   Future<Map<String, dynamic>> signUp({
     required String name,
     required String email,
     required String password,
+    required String code,
   }) async {
     try {
       final response = await _dio.post(
@@ -121,55 +145,61 @@ class ApiService {
           'name': name,
           'email': email,
           'password': password,
+          'code': code,
         },
       );
 
       if (response.statusCode == 201) {
         final data = response.data['data'] ?? response.data;
-        final token = data['accessToken'] ?? data['token'];
-        final userId = data['id'] ?? data['_id'] ?? data['user']?['id'];
-        final userName = data['name'] ?? data['fullName'] ?? data['user']?['fullName'] ?? 'User';
-        final userEmail = data['email'] ?? data['user']?['email'] ?? email;
+        final token = data['accessToken'];
+        final userId = data['id'];
+        final userName = data['name'];
+        final userEmail = data['email'];
 
+        // Sauvegarder
         if (token != null) {
-          await _storage.saveToken(token);
+          await _secureStorage.write(key: 'authToken', value: token);
         }
         if (userId != null) {
-          await _storage.saveUserId(userId);
+          await _secureStorage.write(key: 'userId', value: userId);
         }
         if (userName != null) {
-          await _storage.saveUserName(userName);
+          await _secureStorage.write(key: 'userName', value: userName);
         }
         if (userEmail != null) {
-          await _storage.saveUserEmail(userEmail);
+          await _secureStorage.write(key: 'userEmail', value: userEmail);
         }
 
         return {
           'success': true,
-          'user': {
-            'id': data['id'] ?? data['_id'] ?? data['user']?['id'],
-            'name': data['name'] ?? data['fullName'] ?? data['user']?['fullName'] ?? name,
-            'email': data['email'] ?? data['user']?['email'] ?? email,
-            'role': data['role'] ?? data['user']?['role'] ?? 'voter',
-            'token': token,
-          },
+          'userId': userId,
+          'userName': userName,
+          'email': userEmail,
+          'token': token,
+          'message': 'Inscription réussie',
         };
       }
 
-      return {'success': false, 'message': 'Erreur lors de l\'inscription'};
+      return {
+        'success': false,
+        'message': 'Erreur lors de l\'inscription',
+      };
     } on DioException catch (e) {
-      return _handleAuthError(e);
+      return {
+        'success': false,
+        'message': _getErrorMessage(e),
+      };
     }
   }
 
-  // POST /api/v1/auth/login
-  Future<Map<String, dynamic>> login({
+  /// 🔥 ÉTAPE 1 : POST /api/v1/auth/login/send-code
+  Future<Map<String, dynamic>> loginSendCode({
     required String email,
     required String password,
   }) async {
     try {
       final response = await _dio.post(
-        '/api/v1/auth/login',
+        '/api/v1/auth/login/send-code',
         data: {
           'email': email,
           'password': password,
@@ -177,65 +207,104 @@ class ApiService {
       );
 
       if (response.statusCode == 200) {
-        final data = response.data['data'] ?? response.data;
-        final token = data['accessToken'] ?? data['token'];
-        final userId = data['id'] ?? data['_id'] ?? data['user']?['id'];
-        final userName = data['name'] ?? data['fullName'] ?? data['user']?['fullName'] ?? 'User';
-        final userEmail = data['email'] ?? data['user']?['email'] ?? email;
+        return {
+          'success': true,
+          'message': response.data['message'] ?? 'Code envoyé',
+          'code': response.data['code'], // En dev uniquement
+        };
+      }
 
+      return {
+        'success': false,
+        'message': 'Erreur lors de l\'envoi du code',
+      };
+    } on DioException catch (e) {
+      return {
+        'success': false,
+        'message': _getErrorMessage(e),
+      };
+    }
+  }
+
+  /// 🔥 ÉTAPE 2 : POST /api/v1/auth/login (AVEC code)
+  Future<Map<String, dynamic>> login({
+    required String email,
+    required String code,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/v1/auth/login',
+        data: {
+          'email': email,
+          'code': code,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['data'] ?? response.data;
+        final token = data['accessToken'];
+        final userId = data['id'];
+        final userName = data['name'];
+        final userEmail = data['email'];
+
+        // Sauvegarder
         if (token != null) {
-          await _storage.saveToken(token);
+          await _secureStorage.write(key: 'authToken', value: token);
         }
         if (userId != null) {
-          await _storage.saveUserId(userId);
+          await _secureStorage.write(key: 'userId', value: userId);
         }
         if (userName != null) {
-          await _storage.saveUserName(userName);
+          await _secureStorage.write(key: 'userName', value: userName);
         }
         if (userEmail != null) {
-          await _storage.saveUserEmail(userEmail);
+          await _secureStorage.write(key: 'userEmail', value: userEmail);
         }
 
         return {
           'success': true,
-          'user': {
-            'id': data['id'] ?? data['_id'] ?? data['user']?['id'],
-            'name': data['name'] ?? data['fullName'] ?? data['user']?['fullName'] ?? 'User',
-            'email': data['email'] ?? data['user']?['email'] ?? email,
-            'role': data['role'] ?? data['user']?['role'] ?? 'voter',
-            'token': token,
-          },
+          'userId': userId,
+          'userName': userName,
+          'email': userEmail,
+          'token': token,
+          'message': 'Connexion réussie',
         };
       }
 
-      return {'success': false, 'message': 'Identifiants incorrects'};
+      return {
+        'success': false,
+        'message': 'Identifiants incorrects',
+      };
     } on DioException catch (e) {
-      return _handleAuthError(e);
+      return {
+        'success': false,
+        'message': _getErrorMessage(e),
+      };
     }
   }
 
-  // POST /api/v1/auth/logout
   Future<bool> logout() async {
     try {
       await _dio.post('/api/v1/auth/logout');
-      await _storage.clearAll(); // Utilise la méthode qui nettoie tout
+      await _secureStorage.deleteAll();
       return true;
     } catch (e) {
-      print(' Erreur logout: $e');
-      await _storage.clearAll(); // Nettoie tout même en cas d'erreur
+      print('❌ Erreur logout: $e');
+      await _secureStorage.deleteAll();
       return false;
     }
   }
 
-  /// POST /api/v1/auth/refresh
   Future<String?> refreshToken() async {
     try {
       final response = await _dio.post('/api/v1/auth/refresh');
 
       if (response.statusCode == 200) {
         final newToken = response.data['accessToken'];
-        await _storage.saveToken(newToken);
-        return newToken;
+        if (newToken != null) {
+          await _secureStorage.write(key: 'authToken', value: newToken);
+          return newToken;
+        }
       }
 
       return null;
@@ -245,11 +314,8 @@ class ApiService {
     }
   }
 
+  // ==================== ELECTIONS ENDPOINTS ====================
 
-  // ELECTIONS ENDPOINTS (/api/v1/elections)
-
-
-  // POST /api/v1/elections - Create election
   Future<Map<String, dynamic>> createElection({
     required String title,
     String? description,
@@ -275,171 +341,151 @@ class ApiService {
 
       if (response.statusCode == 201) {
         final data = response.data['data'];
+        final subject = data['subject'];
 
         return {
           'success': true,
-          'subject': data['subject'],
-          'choices': data['choices'],
+          'subjectId': subject['id'],
+          'title': subject['title'],
           'link': data['link'],
+          'choices': subject['choices'] ?? data['choices'],
         };
       }
 
-      return {'success': false};
+      return {'success': false, 'message': 'Erreur de création'};
     } on DioException catch (e) {
-      print('❌ Erreur création élection: ${e.response?.data}');
       return {
         'success': false,
-        'message': e.response?.data['message'] ?? 'Erreur',
+        'message': _getErrorMessage(e),
       };
     }
   }
 
-  // GET /api/v1/elections/created - Get created elections
-  Future<List<Map<String, dynamic>>> getCreatedElections() async {
+  Future<Map<String, dynamic>> getCreatedElections() async {
     try {
       final response = await _dio.get('/api/v1/elections/created');
 
       if (response.statusCode == 200) {
-        final subjects = response.data['subjects'] as List;
-        return subjects.cast<Map<String, dynamic>>();
+        final subjects = response.data['subjects'] as List? ?? [];
+
+        return {
+          'success': true,
+          'elections': subjects,
+        };
       }
 
-      return [];
-    } catch (e) {
-      print('❌ Erreur récupération élections: $e');
-      return [];
+      return {'success': false, 'elections': []};
+    } on DioException catch (e) {
+      return {
+        'success': false,
+        'message': _getErrorMessage(e),
+        'elections': [],
+      };
     }
   }
 
-  // GET /api/v1/elections/participation - Get participating elections
-  Future<List<Map<String, dynamic>>> getParticipatingElections() async {
+  Future<Map<String, dynamic>> getParticipatingElections() async {
     try {
       final response = await _dio.get('/api/v1/elections/participation');
 
       if (response.statusCode == 200) {
-        final invitations = response.data['invitations'] as List;
-        return invitations.cast<Map<String, dynamic>>();
+        final invitations = response.data['invitations'] as List? ?? [];
+
+        return {
+          'success': true,
+          'invitations': invitations,
+        };
       }
 
-      return [];
-    } catch (e) {
-      print('❌ Erreur récupération participations: $e');
-      return [];
+      return {'success': false, 'invitations': []};
+    } on DioException catch (e) {
+      return {
+        'success': false,
+        'message': _getErrorMessage(e),
+        'invitations': [],
+      };
     }
   }
 
-  // GET /api/v1/elections/:subjectId/link - Get election link
-  Future<String?> getElectionLink(String subjectId) async {
-    try {
-      final response = await _dio.get('/api/v1/elections/$subjectId/link');
-
-      if (response.statusCode == 200) {
-        return response.data['link'];
-      }
-
-      return null;
-    } catch (e) {
-      print('❌ Erreur link: $e');
-      return null;
-    }
-  }
-
-  // GET /api/v1/elections/:subjectId/details - Get election details
-  Future<Map<String, dynamic>?> getElectionDetails(String subjectId) async {
-    try {
-      final response = await _dio.get('/api/v1/elections/$subjectId/details');
-
-      if (response.statusCode == 200) {
-        return response.data;
-      }
-
-      return null;
-    } catch (e) {
-      print('❌ Erreur details: $e');
-      return null;
-    }
-  }
-
-  // GET /api/v1/elections/:subjectId/participants - Get participants
-  Future<Map<String, dynamic>?> getElectionParticipants(String subjectId) async {
-    try {
-      final response = await _dio.get('/api/v1/elections/$subjectId/participants');
-
-      if (response.statusCode == 200) {
-        return response.data;
-      }
-
-      return null;
-    } catch (e) {
-      print('❌ Erreur participants: $e');
-      return null;
-    }
-  }
-
-  // GET /api/v1/elections/:subjectId/results - Get results
-  Future<Map<String, dynamic>?> getElectionResults(String subjectId) async {
-    try {
-      final response = await _dio.get('/api/v1/elections/$subjectId/results');
-
-      if (response.statusCode == 200) {
-        return response.data;
-      }
-
-      return null;
-    } catch (e) {
-      print('❌ Erreur résultats: $e');
-      return null;
-    }
-  }
-
-  // GET /api/v1/elections/:subjectId/welcome - Get election welcome
-  Future<Map<String, dynamic>?> getElectionWelcome(String subjectId) async {
+  Future<Map<String, dynamic>> getElectionWelcome(String subjectId) async {
     try {
       final response = await _dio.get('/api/v1/elections/$subjectId/welcome');
 
       if (response.statusCode == 200) {
-        return response.data['subject'];
+        final subject = response.data['subject'];
+
+        return {
+          'success': true,
+          'election': subject,
+        };
       }
 
-      return null;
-    } catch (e) {
-      print('❌ Erreur welcome: $e');
-      return null;
+      return {'success': false, 'message': 'Élection introuvable'};
+    } on DioException catch (e) {
+      return {
+        'success': false,
+        'message': _getErrorMessage(e),
+      };
     }
   }
 
-  // GET /api/v1/elections/:subjectId/register - Register as participant
-  Future<bool> registerForElection(String subjectId) async {
+  Future<Map<String, dynamic>> getElectionDetails(String subjectId) async {
     try {
-      print(' [API] Inscription au vote $subjectId...');
+      final response = await _dio.get('/api/v1/elections/$subjectId');
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'election': response.data,
+        };
+      }
+
+      return {'success': false, 'message': 'Élection introuvable'};
+    } on DioException catch (e) {
+      return {
+        'success': false,
+        'message': _getErrorMessage(e),
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> registerForElection(String subjectId) async {
+    try {
+      print('📝 [API] Inscription au vote $subjectId...');
 
       final response = await _dio.get('/api/v1/elections/$subjectId/register');
 
       if (response.statusCode == 200) {
-        print(' [API] Inscription réussie');
-        return true;
+        print('✅ [API] Inscription réussie');
+        return {
+          'success': true,
+          'message': 'Inscription réussie',
+        };
       }
 
-      return false;
+      return {'success': false, 'message': 'Erreur d\'inscription'};
 
     } on DioException catch (e) {
-      // Si déjà inscrit, ce n'est pas une erreur
       if (e.response?.statusCode == 400) {
         final message = e.response?.data['message']?.toString().toLowerCase() ?? '';
 
         if (message.contains('déjà') || message.contains('already')) {
-          print('  [API] Déjà inscrit');
-          return true;
+          print('ℹ️ [API] Déjà inscrit');
+          return {
+            'success': true,
+            'message': 'Déjà inscrit',
+          };
         }
       }
 
-      print('[API] Erreur register: ${e.response?.statusCode} - ${e.response?.data}');
-      return false;
+      return {
+        'success': false,
+        'message': _getErrorMessage(e),
+      };
     }
   }
 
-  /// POST /api/v1/elections/:subjectId/vote - Vote for election
-  Future<bool> voteForElection({
+  Future<Map<String, dynamic>> voteForElection({
     required String subjectId,
     required String choiceId,
   }) async {
@@ -449,11 +495,118 @@ class ApiService {
         data: {'choiceId': choiceId},
       );
 
-      return response.statusCode == 201;
+      if (response.statusCode == 201) {
+        return {
+          'success': true,
+          'message': 'Vote enregistré',
+        };
+      }
+
+      return {'success': false, 'message': 'Erreur lors du vote'};
     } on DioException catch (e) {
-      print('❌ Erreur vote: ${e.response?.data}');
-      return false;
+      return {
+        'success': false,
+        'message': _getErrorMessage(e),
+      };
     }
   }
 
+  Future<Map<String, dynamic>> getElectionResults(String subjectId) async {
+    try {
+      final response = await _dio.get('/api/v1/elections/$subjectId/results');
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'results': response.data,
+        };
+      }
+
+      return {'success': false, 'message': 'Résultats non disponibles'};
+    } on DioException catch (e) {
+      return {
+        'success': false,
+        'message': _getErrorMessage(e),
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> getElectionLink(String subjectId) async {
+    try {
+      final response = await _dio.get('/api/v1/elections/$subjectId/link');
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'link': response.data['link'],
+        };
+      }
+
+      return {'success': false, 'message': 'Lien non disponible'};
+    } on DioException catch (e) {
+      return {
+        'success': false,
+        'message': _getErrorMessage(e),
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> updateElection({
+    required String subjectId,
+    required String title,
+    String? description,
+    required DateTime deadline,
+    required bool anonymous,
+    required bool isPrivate,
+    required List<String> choices,
+  }) async {
+    try {
+      final response = await _dio.put(
+        '/api/v1/elections/$subjectId',
+        data: {
+          'title': title,
+          'description': description,
+          'deadline': deadline.toUtc().toIso8601String(),
+          'anonymous': anonymous,
+          'isPrivate': isPrivate,
+          'choices': choices.map((name) => {'name': name}).toList(),
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': 'Élection modifiée avec succès',
+          'election': response.data,
+        };
+      }
+
+      return {'success': false, 'message': 'Erreur de modification'};
+    } on DioException catch (e) {
+      return {
+        'success': false,
+        'message': _getErrorMessage(e),
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteElection(String subjectId) async {
+    try {
+      final response = await _dio.delete('/api/v1/elections/$subjectId');
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': 'Élection supprimée avec succès',
+        };
+      }
+
+      return {'success': false, 'message': 'Erreur de suppression'};
+    } on DioException catch (e) {
+      return {
+        'success': false,
+        'message': _getErrorMessage(e),
+      };
+    }
+  }
 }

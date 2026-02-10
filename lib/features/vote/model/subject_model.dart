@@ -1,18 +1,22 @@
 class ChoiceModel {
   String name;
   int voteCount;
+  final String id;
 
   ChoiceModel({
+    required this.id,
     required this.name,
     this.voteCount = 0,
   });
 
   Map<String, dynamic> toJson() => {
+    'id': id,
     'name': name,
     'voteCount': voteCount,
   };
 
   factory ChoiceModel.fromJson(Map<String, dynamic> json) => ChoiceModel(
+    id: json['id'] ?? json['_id'],
     name: json['name'] ?? '',
     voteCount: json['voteCount'] ?? 0,
   );
