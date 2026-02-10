@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secure_vote/features/auth/verification_page.dart';
@@ -256,7 +255,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               const SizedBox(height: 32),
 
               // Bouton de connexion
-             SizedBox(
+              SizedBox(
                 height: 50,
                 child: ElevatedButton(
                   onPressed: vm.canLogin ? () => _handleLogin(context) : null,
@@ -536,7 +535,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => VerificationPage(),
+          builder: (_) => VerificationPage(
+            mode: TwoFAMode.login,
+            verificationToken: response.verificationToken,
+          ),
         ),
       );
     }
@@ -550,7 +552,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => VerificationPage(),
+          builder: (_) => VerificationPage(
+            mode: TwoFAMode.signup,
+            verificationToken: response.verificationToken,
+          ),
         ),
       );
     }
