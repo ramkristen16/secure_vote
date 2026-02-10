@@ -39,7 +39,7 @@ class VerificationPage extends StatelessWidget {
             // Ligne des champs OTP
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(4, (index) => _otpInputBox(context, index == 0)),
+              children: List.generate(6, (index) => _otpInputBox(context, index == 0)),
             ),
 
             const SizedBox(height: 40),

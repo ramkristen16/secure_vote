@@ -6,13 +6,11 @@ import 'dart:convert';
 
 import '../../../core/services/storage_service.dart';
 import '../model/subject_model.dart';
-import '../../../core/services/encryption_service.dart';
 import '../../../core/services/input_validation_service.dart';
 import '../../../core/services/permission_service.dart';
 
 class VoteViewModel extends ChangeNotifier {
   // SERVICES DE SÉCURITÉ
-  final EncryptionService _encryptionService = EncryptionService();
 
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   final _storage = StorageService();
@@ -339,17 +337,7 @@ class VoteViewModel extends ChangeNotifier {
 
       // 5. VALIDATION COMPLÈTE
       InputValidationService.validateVoteObject(voteData);
-
       // 6. CHIFFREMENT DES DONNÉES
-      final encryptedData = _encryptionService.encryptVoteData(voteData);
-
-      // 7. GÉNÉRER UN HASH D'INTÉGRITÉ
-      final dataHash = _encryptionService.generateDataHash(voteData);
-
-      // 8. SIMULATION D'APPEL API
-      await Future.delayed(const Duration(seconds: 1));
-      // TODO: Remplacer par appel API réel
-      // final response = await _apiService.createVote(encryptedData, dataHash);
 
       // 9. CRÉER LE VOTE LOCALEMENT
       final newVote = SubjectModel(
@@ -420,19 +408,6 @@ class VoteViewModel extends ChangeNotifier {
       InputValidationService.checkRateLimit(currentUserId);
 
       // CHIFFRER LE VOTE
-      final encryptedVote = _encryptionService.encryptVoteChoice(
-        choiceIndex,
-        currentUserId,
-      );
-
-      // HASHER L'ID POUR L'ANONYMAT
-      final anonymousId = vote.isAnonymous
-          ? _encryptionService.hashVoterId(currentUserId)
-          : currentUserId;
-
-      // SIMULATION D'APPEL API
-      await Future.delayed(const Duration(milliseconds: 800));
-      // TODO: Remplacer par appel API réel
 
 
       //  NOUVEAU : SAUVEGARDER LE CHOIX LOCALEMENT

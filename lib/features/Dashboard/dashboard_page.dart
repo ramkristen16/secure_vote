@@ -64,7 +64,6 @@ class DashboardPage extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () => _showLogoutDialog(context),
-
           ),
         ],
       ),
@@ -140,6 +139,8 @@ class DashboardPage extends StatelessWidget {
       ),
     );
   }
+
+  // ✅ DÉCONNEXION COMPLÈTE (sans backend)
   Future<void> _showLogoutDialog(BuildContext context) async {
     return showDialog(
       context: context,
@@ -185,7 +186,7 @@ class DashboardPage extends StatelessWidget {
               onPressed: () async {
                 Navigator.of(dialogContext).pop(); // Fermer le dialogue
 
-                // Afficher loading
+                // ✅ 1. Afficher loading
                 showDialog(
                   context: context,
                   barrierDismissible: false,
@@ -196,35 +197,79 @@ class DashboardPage extends StatelessWidget {
                   ),
                 );
 
-                //DÉCONNEXION
+                // ✅ 2. DÉCONNEXION LOCALE (sans backend)
+                try {
+                  final vm = context.read<VoteViewModel>();
 
-                // Fermer le loading
-                if (context.mounted) {
-                  Navigator.of(context).pop();
-                }
+                  // Effacer toutes les données utilisateur
+                  await vm.clearAllData();
 
+                  // Simuler un délai (comme un appel API)
+                  await Future.delayed(const Duration(milliseconds: 800));
 
+                  // Fermer le loading
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
 
-                // Notification de succès
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: const [
-                          Icon(Icons.check_circle, color: Colors.white),
-                          SizedBox(width: 12),
-                          Text('Déconnexion réussie'),
-                        ],
+                  // ✅ 3. RETOUR À LA PAGE DE CONNEXION
+                  // Supprime TOUTE la pile de navigation
+                  if (context.mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginPage()),
+                          (route) => false, // Supprime toutes les routes
+                    );
+                  }
+
+                  // ✅ 4. Notification de succès (optionnelle)
+                  // Note: Cette notification apparaîtra sur la page de login
+                  // Si vous ne voulez pas ça, commentez cette section
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: const [
+                            Icon(Icons.check_circle, color: Colors.white),
+                            SizedBox(width: 12),
+                            Text('Déconnexion réussie'),
+                          ],
+                        ),
+                        backgroundColor: const Color(0xFF4CAF50),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        margin: const EdgeInsets.all(16),
+                        duration: const Duration(seconds: 2),
                       ),
-                      backgroundColor: const Color(0xFF4CAF50),
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                    );
+                  }
+                } catch (e) {
+                  // Fermer le loading en cas d'erreur
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+
+                  // Afficher un message d'erreur
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: const [
+                            Icon(Icons.error_outline, color: Colors.white),
+                            SizedBox(width: 12),
+                            Text('Erreur lors de la déconnexion'),
+                          ],
+                        ),
+                        backgroundColor: Colors.red,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        margin: const EdgeInsets.all(16),
                       ),
-                      margin: const EdgeInsets.all(16),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
+                    );
+                  }
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -249,8 +294,6 @@ class DashboardPage extends StatelessWidget {
       },
     );
   }
-
-
 
   Widget _buildActionCard(
       BuildContext context, {

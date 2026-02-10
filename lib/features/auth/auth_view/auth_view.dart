@@ -529,7 +529,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   Future<void> _handleLogin(BuildContext context) async {
     final vm = context.read<AuthViewModel>();
-    final response = await vm.submitLogin();
+    final response = await vm.submitLoginSendCode();
 
     if (response != null && context.mounted) {
       Navigator.push(

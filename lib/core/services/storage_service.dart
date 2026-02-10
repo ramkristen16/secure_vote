@@ -1,4 +1,3 @@
-// lib/core/services/storage_service.dart
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,7 +12,6 @@ class StorageService {
   final _secureStorage = const FlutterSecureStorage();
   final _uuid = const Uuid();
 
-  // ========== USER DATA (GÉNÉRÉ AUTOMATIQUEMENT) ==========
 
   /// Obtenir ou créer un ID utilisateur unique
   Future<String> getUserId() async {
@@ -84,7 +82,6 @@ class StorageService {
     return key;
   }
 
-  // ========== RATE LIMITING ==========
 
   /// Sauvegarder les données de rate limiting
   Future<void> saveRateLimitData(String userId, Map<String, dynamic> data) async {
@@ -111,22 +108,7 @@ class StorageService {
     await _secureStorage.delete(key: 'rate_limit_$userId');
   }
 
-  // ════════════════════════════════════════════════════════════════
-  // ✨ NOUVEAUTÉ : GESTION DES VOTES LOCAUX (CHOIX UTILISATEUR)
-  // ════════════════════════════════════════════════════════════════
 
-  /// 🗳️ Sauvegarder le choix de vote de l'utilisateur pour un scrutin
-  ///
-  /// Cette méthode stocke localement le choix de l'utilisateur APRÈS
-  /// que le backend ait reçu le vote (et l'ait crypté en one-way).
-  ///
-  /// [voteId] : ID du scrutin (ex: "ABC123")
-  /// [choiceIndex] : Index du choix sélectionné (0, 1, 2...)
-  ///
-  /// Exemple :
-  /// ```dart
-  /// await storage.saveUserVoteChoice("ABC123", 1); // A voté pour l'option 1
-  /// ```
   Future<void> saveUserVoteChoice(String voteId, int choiceIndex) async {
     try {
       await _secureStorage.write(

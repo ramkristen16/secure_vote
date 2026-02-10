@@ -1,22 +1,6 @@
-/// Service de validation des entrées utilisateur
-///
-/// Fournit des méthodes statiques pour valider différents types de données
-/// avant de les envoyer au backend ou de les stocker
+
 class InputValidationService {
-  // pour l'email
 
-  // Valider un email
-
-  // Vérifie le format basique d'un email (présence de @ et d'un domaine)
-
-  // Exemples valides:
-  // - user@example.com
-  // - test.user+tag@domain.co.uk
-
-  // Exemples invalides:
-  // - user@
-  // - @example.com
-  // - user.example.com
   static bool isValidEmail(String email) {
     if (email.isEmpty) return false;
 

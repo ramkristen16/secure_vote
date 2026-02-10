@@ -5,7 +5,6 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:app_links/app_links.dart';
 import 'package:secure_vote/features/Dashboard/dashboard_page.dart';
 import 'dart:async';
-
 import 'features/auth/auth_view/auth_view.dart';
 import 'features/auth/auth_viewModel/auth_viewModel.dart';
 import 'features/vote/view_model/vote_view_model.dart';

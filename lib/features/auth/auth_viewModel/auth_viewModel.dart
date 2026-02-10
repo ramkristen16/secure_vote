@@ -42,7 +42,7 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<LoginCredentialResponse?> submitLogin() async {
+  Future<LoginCredentialResponse?> submitLoginSendCode() async {
     if (!canLogin) {
       _loginError = 'Veuillez remplir tous les champs';
       notifyListeners();
